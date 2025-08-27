@@ -1,5 +1,17 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`Format > should format multi-root fixture 1`] = `
+"<view class="container">
+  <text>First root element</text>
+</view>
+<button bindtap="handleClick">
+  Click me
+
+</button>
+<image src="/images/test.png" />
+"
+`;
+
 exports[`Format > should handle complex expressions 1`] = `
 "<root>
   <!-- 基本逻辑运算符 -->

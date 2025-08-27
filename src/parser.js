@@ -254,13 +254,77 @@ function restoreProtectedContent(node, protectedItems) {
   return node;
 }
 
+// Check if text has multiple root elements
+function hasMultipleRoots(text) {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith('<')) return false;
+  
+  // Find the end of the first root element
+  let depth = 0;
+  let inTag = false;
+  let inString = false;
+  let stringChar = null;
+  let firstRootEnd = -1;
+  
+  for (let i = 0; i < trimmed.length; i++) {
+    const char = trimmed[i];
+    const prevChar = i > 0 ? trimmed[i - 1] : null;
+    
+    if (inString) {
+      if (char === stringChar && prevChar !== '\\') {
+        inString = false;
+        stringChar = null;
+      }
+      continue;
+    }
+    
+    if (char === '"' || char === "'") {
+      inString = true;
+      stringChar = char;
+      continue;
+    }
+    
+    if (char === '<') {
+      inTag = true;
+      if (trimmed[i + 1] === '/') {
+        depth--;
+      } else if (trimmed[i + 1] !== '!' && trimmed[i + 1] !== '?') {
+        depth++;
+      }
+    } else if (char === '>' && inTag) {
+      inTag = false;
+      if (prevChar === '/') {
+        depth--;
+      }
+      if (depth === 0 && firstRootEnd === -1) {
+        firstRootEnd = i;
+      }
+    }
+  }
+  
+  if (firstRootEnd === -1) return false;
+  
+  // Check if there's more content after the first root
+  const remaining = trimmed.slice(firstRootEnd + 1).trim();
+  return remaining.length > 0 && remaining.startsWith('<');
+}
+
 const parser = {
   parse(text) {
     try {
       // Pre-process template expressions
       const { processedText, protectedItems } = preprocessTemplateExpressions(text);
       
-      const { cst, tokenVector, lexErrors, parseErrors } = xmlToolsParse(processedText);
+      // Check for multiple roots and wrap if necessary
+      let needsUnwrapping = false;
+      let textToParse = processedText;
+      
+      if (hasMultipleRoots(processedText)) {
+        textToParse = `<__wxml_root__>${processedText}</__wxml_root__>`;
+        needsUnwrapping = true;
+      }
+      
+      const { cst, tokenVector, lexErrors, parseErrors } = xmlToolsParse(textToParse);
 
       if (lexErrors.length > 0) {
         throw createError(lexErrors[0].message, {
@@ -293,6 +357,27 @@ const parser = {
       
       // Restore protected content
       ast = restoreProtectedContent(ast, protectedItems);
+      
+      // Unwrap virtual root if it was added
+      if (needsUnwrapping && ast.name === 'document' && ast.element && ast.element.length === 1) {
+        const rootElement = ast.element[0];
+        if (rootElement.Name === '__wxml_root__') {
+          // Extract child elements from the virtual root
+          const childElements = [];
+          if (rootElement.content && rootElement.content.element) {
+            childElements.push(...rootElement.content.element);
+          }
+          // Create a new document with multiple root elements
+          ast = {
+            name: 'document',
+            element: childElements,
+            misc: ast.misc || [],
+            docTypeDecl: ast.docTypeDecl || null,
+            prolog: ast.prolog || null,
+            location: ast.location
+          };
+        }
+      }
       
       // Add comment tokens to AST for ignore functionality
       ast.commentTokens = commentTokens;

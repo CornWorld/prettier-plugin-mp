@@ -28,6 +28,18 @@ describe("Format", () => {
     expect(result).toBe(`<view class="container" id="main"></view>\n`);
   });
 
+  it("should handle multiple root elements", async () => {
+    const input = `<view>First</view><text>Second</text><button>Third</button>`;
+    const result = await formatWxml(input);
+    expect(result).toBe(`<view>First</view>\n<text>Second</text>\n<button>Third</button>\n`);
+  });
+
+  it("should format multi-root fixture", async () => {
+    const content = readFileSync(join(process.cwd(), "test/fixtures/test-multi-root.wxml"), "utf8");
+    const result = await formatWxml(content);
+    expect(result).toMatchSnapshot();
+  });
+
   it("should handle interpolation", async () => {
     const result = await formatWxml("<view>{{ a + b }}</view>");
     expect(result).toBe("<view>{{ a + b }}</view>\n");

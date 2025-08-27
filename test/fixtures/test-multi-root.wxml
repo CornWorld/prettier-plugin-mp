@@ -1,0 +1,7 @@
+<view class="container">
+  <text>First root element</text>
+</view>
+<button bindtap="handleClick">
+  Click me
+</button>
+<image src="/images/test.png" />
