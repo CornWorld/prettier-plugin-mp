@@ -1,0 +1,10 @@
+<root>
+  <view class="normal">normal formatting</view>
+  <!-- prettier-ignore-start -->
+  <view class="messy-formatting"    id="test">
+    <text>ignored content</text>
+      <view>nested   element</view>
+  </view>
+  <!-- prettier-ignore-end -->
+  <view class="normal-again">normal formatting again</view>
+</root>

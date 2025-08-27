@@ -1,0 +1,28 @@
+<root>
+  <!-- wxs 标签内包含类似模板语法的 JS 代码 -->
+  <wxs module="utils">
+    // 这里有类似模板语法的字符串
+    var template = "Hello {{name}}, your score is {{score}}";
+    var regex = /{{\w+}}/g;
+    
+    function processTemplate(data) {
+      var result = template;
+      // 使用 && 逻辑运算符
+      if (data && data.name) {
+        result = result.replace('{{name}}', data.name);
+      }
+      if (data && data.score) {
+        result = result.replace('{{score}}', data.score);
+      }
+      return result;
+    }
+    
+    module.exports = {
+      processTemplate: processTemplate
+    };
+  </wxs>
+  
+  <view class="{{item && item.className}}">
+    <text>{{utils && utils.processTemplate(userData)}}</text>
+  </view>
+</root>
