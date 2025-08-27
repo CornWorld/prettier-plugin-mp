@@ -1,0 +1,49 @@
+{
+  "name": "prettier-plugin-mp",
+  "version": "1.0.0",
+  "description": "Prettier plugin for WeChat Mini Program WXML files",
+  "main": "src/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CornWorld/prettier-plugin-mp.git"
+  },
+  "exports": {
+    ".": {
+      "import": "./src/index.js",
+      "require": "./src/index.js"
+    }
+  },
+  "scripts": {
+    "test": "cross-env NODE_OPTIONS='--experimental-vm-modules' pnpm jest",
+    "test:watch": "cross-env NODE_OPTIONS='--experimental-vm-modules' pnpm jest --watch",
+    "test:coverage": "cross-env NODE_OPTIONS='--experimental-vm-modules' pnpm jest --coverage",
+    "format": "prettier --write \"**/*.{js,json,md}\"",
+    "format:wxml": "prettier --plugin=./index.js --write \"**/*.wxml\""
+  },
+  "keywords": [
+    "prettier",
+    "plugin",
+    "wechat",
+    "miniprogram",
+    "wxml",
+    "wxs",
+    "formatter",
+    "prettier-plugin",
+    "wechat-miniprogram",
+    "wxml-formatter",
+    "prettier-plugin-wxml"
+  ],
+  "author": "CornWorld <github.contact@corn.im>",
+  "license": "MIT",
+  "packageManager": "pnpm@10.13.1",
+  "peerDependencies": {
+    "prettier": "^3.0.0"
+  },
+  "devDependencies": {
+    "jest": "^30.0.5",
+    "prettier": "^3.6.2"
+  },
+  "dependencies": {
+    "prettier": "^3.0.0"
+  }
+}
