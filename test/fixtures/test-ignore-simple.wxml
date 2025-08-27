@@ -1,0 +1,10 @@
+<root>
+  <!-- prettier-ignore -->
+  <view class="messy-formatting"       id="test"    >
+    <text>simple text</text>
+  </view>
+
+  <view class="normal">
+    <text>normal formatting</text>
+  </view>
+</root>

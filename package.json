@@ -13,10 +13,10 @@
       "require": "./src/index.js"
     }
   },
+  "type": "module",
   "scripts": {
-    "test": "cross-env NODE_OPTIONS='--experimental-vm-modules' pnpm jest",
-    "test:watch": "cross-env NODE_OPTIONS='--experimental-vm-modules' pnpm jest --watch",
-    "test:coverage": "cross-env NODE_OPTIONS='--experimental-vm-modules' pnpm jest --coverage",
+    "test": "vitest run",
+    "test:coverage": "vitest --coverage",
     "format": "prettier --write \"**/*.{js,json,md}\"",
     "format:wxml": "prettier --plugin=./index.js --write \"**/*.wxml\""
   },
@@ -39,11 +39,11 @@
   "peerDependencies": {
     "prettier": "^3.0.0"
   },
-  "devDependencies": {
-    "jest": "^30.0.5",
-    "prettier": "^3.6.2"
-  },
   "dependencies": {
-    "prettier": "^3.0.0"
+    "@xml-tools/parser": "^1.0.11"
+  },
+  "devDependencies": {
+    "prettier": "^3.0.0",
+    "vitest": "^3.2.4"
   }
 }

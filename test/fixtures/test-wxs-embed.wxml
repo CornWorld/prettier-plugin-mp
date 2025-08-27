@@ -1,0 +1,20 @@
+<root>
+  <wxs module="utils">
+    var formatPrice = function(price) {
+      if (!price) return '--';
+      return '¥' + price.toFixed(2);
+    };
+    var isValid = function(user) {
+      return user ? true : false;
+    };
+    module.exports = {
+      formatPrice: formatPrice,
+      isValid: isValid
+    };
+  </wxs>
+  
+  <view class="{{data}}">
+    <text>{{utils.formatPrice(item.price)}}</text>
+    <text wx:if="{{utils.isValid(user)}}">{{user.name}}</text>
+  </view>
+</root>
