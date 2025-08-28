@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@wxml/parser':
+        specifier: ^0.4.0
+        version: 0.4.0
       '@xml-tools/parser':
         specifier: ^1.0.11
         version: 1.0.11
@@ -317,6 +320,9 @@ packages:
 
   '@vitest/utils@3.2.4':
     resolution: {integrity: sha512-fB2V0JFrQSMsCo9HiSq3Ezpdv4iYaXRG1Sx8edX3MwxfyNn83mKiGzOcH+Fkxt4MHxr3y42fQi1oeAInqgX2QA==}
+
+  '@wxml/parser@0.4.0':
+    resolution: {integrity: sha512-pS0OPyKzCOhCPGlcfO9IDLZbqH4485bPdGDqaa+hYnI+cY/OW+GN4J88XpfdzM8wXJcJShFZy5F6MTUr2rysXg==}
 
   '@xml-tools/parser@1.0.11':
     resolution: {integrity: sha512-aKqQ077XnR+oQtHJlrAflaZaL7qZsulWc/i/ZEooar5JiWj1eLt0+Wg28cpa+XLney107wXqneC+oG1IZvxkTA==}
@@ -737,6 +743,8 @@ snapshots:
       '@vitest/pretty-format': 3.2.4
       loupe: 3.2.1
       tinyrainbow: 2.0.0
+
+  '@wxml/parser@0.4.0': {}
 
   '@xml-tools/parser@1.0.11':
     dependencies:
