@@ -186,6 +186,7 @@ function printContent(path, opts, print) {
     // Get all content nodes with their offsets
     const contentNodes = [];
     const { element, chardata, CData } = path.getValue();
+    // Comment is already destructured above
     
     if (element) {
       element.forEach((el, index) => {
@@ -210,6 +211,20 @@ function printContent(path, opts, print) {
             start: cd.location.startOffset,
             end: cd.location.endOffset,
             node: cd
+          });
+        }
+      });
+    }
+    
+    if (Comment) {
+      Comment.forEach((comment, index) => {
+        if (comment.location) {
+          contentNodes.push({
+            type: 'comment',
+            index,
+            start: comment.location.startOffset,
+            end: comment.location.endOffset,
+            node: comment
           });
         }
       });
@@ -244,6 +259,14 @@ function printContent(path, opts, print) {
           }
         } else if (contentNode.type === 'chardata') {
           const printed = path.call(print, "chardata", contentNode.index);
+          if (printed && printed !== "") {
+            result.push({
+              offset: contentNode.start,
+              printed
+            });
+          }
+        } else if (contentNode.type === 'comment') {
+          const printed = path.call(print, "Comment", contentNode.index);
           if (printed && printed !== "") {
             result.push({
               offset: contentNode.start,
@@ -386,30 +409,52 @@ function printDocument(path, opts, print) {
   const node = path.getValue();
   const { element, misc } = node;
   
+  // Create a list of all items (elements and comments) with their positions
+  const allItems = [];
+  
+  if (element) {
+    element.forEach((el, index) => {
+      allItems.push({
+        type: 'element',
+        index,
+        startOffset: el.location ? el.location.startOffset : 0,
+        node: el
+      });
+    });
+  }
+  
+  if (misc) {
+    misc.forEach((miscNode, index) => {
+      allItems.push({
+        type: 'misc',
+        index,
+        startOffset: miscNode.location ? miscNode.location.startOffset : 0,
+        node: miscNode
+      });
+    });
+  }
+  
+  // Sort by position to maintain original order
+  allItems.sort((a, b) => a.startOffset - b.startOffset);
+  
   const parts = [];
   
-  // Add misc comments before elements
-  if (misc && misc.length > 0) {
-    misc.forEach((miscNode, index) => {
-      const printed = path.call(print, "misc", index);
-      if (printed && printed !== "") {
-        parts.push(printed, hardline);
+  allItems.forEach((item, itemIndex) => {
+    let printed;
+    
+    if (item.type === 'element') {
+      printed = path.call(print, "element", item.index);
+    } else {
+      printed = path.call(print, "misc", item.index);
+    }
+    
+    if (printed && printed !== "") {
+      if (parts.length > 0) {
+        parts.push(hardline);
       }
-    });
-  }
-  
-  // Add all elements
-  if (element && element.length > 0) {
-    element.forEach((el, index) => {
-      const printed = path.call(print, "element", index);
-      if (printed && printed !== "") {
-        if (parts.length > 0) {
-          parts.push(hardline);
-        }
-        parts.push(printed);
-      }
-    });
-  }
+      parts.push(printed);
+    }
+  });
   
   if (parts.length > 0) {
     parts.push(hardline);
