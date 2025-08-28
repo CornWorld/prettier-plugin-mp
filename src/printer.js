@@ -1,7 +1,7 @@
 import * as doc from "prettier/doc";
 import embed from "./embed.js";
 
-const { group, hardline, indent, join, line, softline } = doc.builders;
+const { group, hardline, indent, join, line, softline, ifBreak } = doc.builders;
 
 const ignoreStartComment = "<!-- prettier-ignore-start -->";
 const ignoreEndComment = "<!-- prettier-ignore-end -->";
@@ -10,19 +10,9 @@ function hasIgnoreRanges(comments) {
   if (comments.length === 0) {
     return false;
   }
-
-  comments.sort((left, right) => left.startOffset - right.startOffset);
-
-  let startFound = false;
-  for (let idx = 0; idx < comments.length; idx += 1) {
-    if (comments[idx].image === ignoreStartComment) {
-      startFound = true;
-    } else if (startFound && comments[idx].image === ignoreEndComment) {
-      return true;
-    }
-  }
-
-  return false;
+  
+  // Reuse buildIgnoreRanges logic to avoid duplication
+  return buildIgnoreRanges(null, comments).length > 0;
 }
 
 function buildIgnoreRanges(ast, comments) {
@@ -50,107 +40,87 @@ function buildIgnoreRanges(ast, comments) {
 // Template expression regex for {{ }} patterns
 const TEMPLATE_EXPR_REGEX = /\{\{[^}]*\}\}/g;
 
-function isWhitespaceIgnorable(content) {
-  // For WXML, we only preserve whitespace if it contains template expressions
-  if (content && content.chardata) {
-    for (const chardata of content.chardata) {
-      const text = chardata.TEXT || chardata.SEA_WS || "";
-      if (TEMPLATE_EXPR_REGEX.test(text)) {
-        return false;
+function printAttribute(path, opts, print) {
+  const node = path.getValue();
+  const { key, value, rawValue } = node;
+  
+  // Handle boolean attributes (no value)
+  if (value === null) {
+    return key;
+  }
+  
+  // Use rawValue (restored content) if available, otherwise use value
+  let attributeValue = rawValue || value;
+  
+  // Ensure proper quoting for attribute values
+  if (!attributeValue.startsWith('"') && !attributeValue.startsWith("'")) {
+    // Value doesn't have quotes, add them based on preference
+    if (opts.wxmlSingleQuote) {
+      attributeValue = `'${attributeValue}'`;
+    } else {
+      attributeValue = `"${attributeValue}"`;
+    }
+  } else {
+    // Handle quote style conversion for already quoted values
+    if (opts.wxmlSingleQuote && attributeValue.startsWith('"') && attributeValue.endsWith('"')) {
+      const content = attributeValue.slice(1, -1);
+      if (!content.includes("'")) {
+        attributeValue = `'${content}'`;
+      }
+    } else if (!opts.wxmlSingleQuote && attributeValue.startsWith("'") && attributeValue.endsWith("'")) {
+      const content = attributeValue.slice(1, -1);
+      if (!content.includes('"')) {
+        attributeValue = `"${content}"`;
       }
     }
   }
-  return true;
-}
-
-function printAttribute(path, opts, print) {
-  const node = path.getValue();
-  const { Name, EQUALS, STRING, isBooleanAttr } = node;
   
-  // Handle boolean attributes (no value)
-  if (isBooleanAttr || !EQUALS || !STRING) {
-    return Name;
-  }
-  
-  // Handle quote style for WXML
-  let attributeValue = STRING;
-  if (opts.wxmlSingleQuote && STRING.startsWith('"') && STRING.endsWith('"')) {
-    const content = STRING.slice(1, -1);
-    if (!content.includes("'")) {
-      attributeValue = `'${content}'`;
-    }
-  } else if (!opts.wxmlSingleQuote && STRING.startsWith("'") && STRING.endsWith("'")) {
-    const content = STRING.slice(1, -1);
-    if (!content.includes('"')) {
-      attributeValue = `"${content}"`;
-    }
-  }
-  
-  return [Name, EQUALS, attributeValue];
+  return `${key}=${attributeValue}`;
 }
 
 function printCharData(path, opts, print) {
   const node = path.getValue();
-  const { SEA_WS, TEXT } = node;
+  const { value } = node;
   
-  if (SEA_WS) {
-    // In indent mode, filter out pure whitespace
-    if (opts.useTabs || opts.tabWidth > 0) {
-      const trimmed = SEA_WS.trim();
-      return trimmed ? SEA_WS : "";
-    }
-    return SEA_WS;
+  if (!value) {
+    return "";
   }
   
-  return TEXT || "";
+  // 如果文本内容仅包含空白字符，完全忽略
+  if (value.trim() === "") {
+    return "";
+  }
+  
+  // 对于有实际内容的文本，去除两端空白
+  return value.trim();
+}
+
+function addContentFragments(fragments, items, path, print, key) {
+  if (!items) return;
+  
+  items.forEach((item, index) => {
+    const printed = path.call(print, key, index);
+    if (printed && printed !== "") {
+      fragments.push({
+        offset: item.location ? item.location.startOffset : 0,
+        printed
+      });
+    }
+  });
 }
 
 function printContentFragments(path, print) {
   const node = path.getValue();
-  const { CData, Comment, chardata, element, reference } = node;
+  const { CData, Comment, chardata, element } = node;
   
   const fragments = [];
   
-  // Add comments with offset tracking
-  if (Comment) {
-    Comment.forEach((comment, index) => {
-      const printed = path.call(print, "Comment", index);
-      if (printed && printed !== "") {
-        fragments.push({
-          offset: comment.location ? comment.location.startOffset : 0,
-          printed
-        });
-      }
-    });
-  }
+  // Add all content types using the helper function
+  addContentFragments(fragments, Comment, path, print, "Comment");
+  addContentFragments(fragments, chardata, path, print, "chardata");
+  addContentFragments(fragments, element, path, print, "element");
   
-  // Add character data with offset tracking
-  if (chardata) {
-    chardata.forEach((cd, index) => {
-      const printed = path.call(print, "chardata", index);
-      if (printed && printed !== "") {
-        fragments.push({
-          offset: cd.location ? cd.location.startOffset : 0,
-          printed
-        });
-      }
-    });
-  }
-  
-  // Add elements with offset tracking
-  if (element) {
-    element.forEach((el, index) => {
-      const printed = path.call(print, "element", index);
-      if (printed && printed !== "") {
-        fragments.push({
-          offset: el.location ? el.location.startOffset : 0,
-          printed
-        });
-      }
-    });
-  }
-  
-  // Add CData (for wxs content)
+  // CData has different structure, handle separately
   if (CData) {
     CData.forEach((cdata, index) => {
       fragments.push({
@@ -163,126 +133,120 @@ function printContentFragments(path, print) {
   return fragments;
 }
 
+function collectContentNodes(path) {
+  const contentNodes = [];
+  const { element, chardata, Comment } = path.getValue();
+  
+  if (element) {
+    element.forEach((el, index) => {
+      if (el.location) {
+        contentNodes.push({
+          type: 'element',
+          index,
+          start: el.location.startOffset,
+          end: el.location.endOffset,
+          node: el
+        });
+      }
+    });
+  }
+  
+  if (chardata) {
+    chardata.forEach((cd, index) => {
+      if (cd.location) {
+        contentNodes.push({
+          type: 'chardata',
+          index,
+          start: cd.location.startOffset,
+          end: cd.location.endOffset,
+          node: cd
+        });
+      }
+    });
+  }
+  
+  if (Comment) {
+    Comment.forEach((comment, index) => {
+      if (comment.location) {
+        contentNodes.push({
+          type: 'comment',
+          index,
+          start: comment.location.startOffset,
+          end: comment.location.endOffset,
+          node: comment
+        });
+      }
+    });
+  }
+  
+  return contentNodes.sort((a, b) => a.start - b.start);
+}
+
+function processContentNode(contentNode, path, opts, print, ignoreRanges) {
+  const isInIgnoreRange = ignoreRanges.some(range => 
+    contentNode.start >= range.start && contentNode.end <= range.end
+  );
+  
+  if (isInIgnoreRange) {
+    const originalContent = opts.originalText.slice(contentNode.start, contentNode.end + 1);
+    return {
+      offset: contentNode.start,
+      printed: doc.utils.replaceEndOfLine(originalContent)
+    };
+  }
+  
+  let printed;
+  if (contentNode.type === 'element') {
+    printed = path.call(print, "element", contentNode.index);
+  } else if (contentNode.type === 'chardata') {
+    printed = path.call(print, "chardata", contentNode.index);
+  } else if (contentNode.type === 'comment') {
+    printed = path.call(print, "Comment", contentNode.index);
+  }
+  
+  if (printed && printed !== "") {
+    return {
+      offset: contentNode.start,
+      printed
+    };
+  }
+  
+  return null;
+}
+
+function processIgnoredContent(path, opts, print) {
+  const { Comment } = path.getValue();
+  const ignoreRanges = buildIgnoreRanges(path.getValue(), Comment);
+  const contentNodes = collectContentNodes(path);
+  
+  const result = [];
+  contentNodes.forEach(contentNode => {
+    const processed = processContentNode(contentNode, path, opts, print, ignoreRanges);
+    if (processed) {
+      result.push(processed);
+    }
+  });
+  
+  return result;
+}
+
+function shouldKeepInline(path) {
+  const { chardata, element } = path.getValue();
+  const elementCount = element ? element.length : 0;
+  const hasOnlyTemplateContent = chardata && chardata.every(cd => {
+    const text = cd.TEXT || cd.SEA_WS || "";
+    return !text.trim() || TEMPLATE_EXPR_REGEX.test(text);
+  });
+  
+  return hasOnlyTemplateContent && elementCount === 0;
+}
+
 function printContent(path, opts, print) {
   let fragments = printContentFragments(path, print);
   const { Comment } = path.getValue();
 
   if (hasIgnoreRanges(Comment)) {
-    Comment.sort((left, right) => left.startOffset - right.startOffset);
-
-    const ignoreRanges = [];
-    let ignoreStart = null;
-
-    // Build up a list of ignored ranges from the original text based on
-    // the special prettier-ignore-* comments
-    Comment.forEach((comment) => {
-      if (comment.image === ignoreStartComment) {
-        ignoreStart = comment;
-      } else if (ignoreStart && comment.image === ignoreEndComment) {
-        ignoreRanges.push({
-          start: ignoreStart.startOffset,
-          end: comment.endOffset
-        });
-
-        ignoreStart = null;
-      }
-    });
-
-    // Get all content nodes with their offsets
-    const contentNodes = [];
-    const { element, chardata, CData } = path.getValue();
-    // Comment is already destructured above
-    
-    if (element) {
-      element.forEach((el, index) => {
-        if (el.location) {
-          contentNodes.push({
-            type: 'element',
-            index,
-            start: el.location.startOffset,
-            end: el.location.endOffset,
-            node: el
-          });
-        }
-      });
-    }
-    
-    if (chardata) {
-      chardata.forEach((cd, index) => {
-        if (cd.location) {
-          contentNodes.push({
-            type: 'chardata',
-            index,
-            start: cd.location.startOffset,
-            end: cd.location.endOffset,
-            node: cd
-          });
-        }
-      });
-    }
-    
-    if (Comment) {
-      Comment.forEach((comment, index) => {
-        if (comment.location) {
-          contentNodes.push({
-            type: 'comment',
-            index,
-            start: comment.location.startOffset,
-            end: comment.location.endOffset,
-            node: comment
-          });
-        }
-      });
-    }
-    
-    // Sort by start offset
-    contentNodes.sort((a, b) => a.start - b.start);
-    
-    const result = [];
-    
-    contentNodes.forEach(contentNode => {
-      const isInIgnoreRange = ignoreRanges.some(range => 
-        contentNode.start >= range.start && contentNode.end <= range.end
-      );
-      
-      if (isInIgnoreRange) {
-        // Use original text for ignored content
-        const originalContent = opts.originalText.slice(contentNode.start, contentNode.end + 1);
-        result.push({
-          offset: contentNode.start,
-          printed: doc.utils.replaceEndOfLine(originalContent)
-        });
-      } else {
-        // Use formatted content
-        if (contentNode.type === 'element') {
-          const printed = path.call(print, "element", contentNode.index);
-          if (printed && printed !== "") {
-            result.push({
-              offset: contentNode.start,
-              printed
-            });
-          }
-        } else if (contentNode.type === 'chardata') {
-          const printed = path.call(print, "chardata", contentNode.index);
-          if (printed && printed !== "") {
-            result.push({
-              offset: contentNode.start,
-              printed
-            });
-          }
-        } else if (contentNode.type === 'comment') {
-          const printed = path.call(print, "Comment", contentNode.index);
-          if (printed && printed !== "") {
-            result.push({
-              offset: contentNode.start,
-              printed
-            });
-          }
-        }
-      }
-    });
-    
-    fragments = result;
+    fragments = processIgnoredContent(path, opts, print);
   }
 
   fragments.sort((left, right) => left.offset - right.offset);
@@ -295,29 +259,11 @@ function printContent(path, opts, print) {
     return "";
   }
   
-  // Check if we have multiple elements that need line breaks
-  const elementCount = path.getValue().element ? path.getValue().element.length : 0;
-  if (elementCount > 1) {
-    // Add line breaks between multiple elements
-    const result = [];
-    for (let i = 0; i < validFragments.length; i++) {
-      if (i > 0 && validFragments[i] && validFragments[i-1]) {
-        result.push(hardline);
-      }
-      result.push(validFragments[i]);
-    }
-    return result;
+  if (validFragments.length > 1) {
+    return validFragments;
   }
   
-  // Check if content only contains template expressions and whitespace
-  const { chardata } = path.getValue();
-  const hasOnlyTemplateContent = chardata && chardata.every(cd => {
-    const text = cd.TEXT || cd.SEA_WS || "";
-    return !text.trim() || TEMPLATE_EXPR_REGEX.test(text);
-  });
-  
-  if (hasOnlyTemplateContent && elementCount === 0) {
-    // Keep template expressions inline
+  if (shouldKeepInline(path)) {
     return validFragments;
   }
   
@@ -326,85 +272,54 @@ function printContent(path, opts, print) {
 
 function printElement(path, opts, print) {
   const node = path.getValue();
-  const { OPEN, Name, attribute, START_CLOSE, content, SLASH_CLOSE, SLASH_OPEN, END_NAME, END } = node;
+  const parts = [];
   
-  // Check if this element should be ignored based on preceding comment
-   const parent = path.getParentNode();
-   if (parent && parent.Comment) {
-     const elementOffset = node.location ? node.location.startOffset : 0;
-     const precedingComment = parent.Comment.find(comment => {
-       const commentEnd = comment.location ? comment.location.endOffset : 0;
-       return comment.image === "<!-- prettier-ignore -->" && commentEnd < elementOffset;
-     });
-     
-     if (precedingComment && precedingComment.location && node.location) {
-       // Return original text for ignored element
-       const start = precedingComment.location.startOffset;
-       const end = node.location.endOffset;
-       return opts.originalText.slice(start, end + 1);
-     }
-   }
+  // Print start tag
+  if (node.startTag) {
+    parts.push(path.call(print, "startTag"));
+  }
   
-  const parts = [OPEN, Name];
-  
-  // Add attributes
-  if (attribute && attribute.length > 0) {
-    const usePrintWidth = opts.wxmlPrintWidth !== undefined ? opts.wxmlPrintWidth : opts.printWidth;
+  // Handle children
+  if (node.children && node.children.length > 0) {
+    const childrenParts = [];
     
-    // Calculate if attributes should be on same line
-    const attributesOnSameLine = join(" ", path.map(print, "attribute"));
-    const sameLineLength = Name.length + 1 + attributesOnSameLine.toString().length + 1;
+    for (let i = 0; i < node.children.length; i++) {
+      const printed = path.call(print, "children", i);
+      if (printed && printed !== "") {
+        childrenParts.push(printed);
+      }
+    }
     
-    if (sameLineLength <= usePrintWidth) {
-      parts.push(" ", attributesOnSameLine);
-    } else {
-      // Put attributes on new lines
-      parts.push(
-        indent([hardline, join(hardline, path.map(print, "attribute"))]),
-        hardline
-      );
+    if (childrenParts.length > 0) {
+      // Check if content should be inlined
+      const hasOnlySimpleText = node.children.length === 1 && 
+        node.children[0].type === "WXText" && 
+        node.children[0].value && 
+        node.children[0].value.trim().length < 50 && 
+        !node.children[0].value.includes("\n");
+      
+      if (hasOnlySimpleText) {
+        // For inline content
+        parts.push(...childrenParts);
+      } else {
+        // For block content - add proper line breaks and indentation
+        if (childrenParts.length > 0) {
+          const childrenWithBreaks = [];
+          for (let i = 0; i < childrenParts.length; i++) {
+            if (i > 0) {
+              childrenWithBreaks.push(hardline);
+            }
+            childrenWithBreaks.push(childrenParts[i]);
+          }
+          parts.push(indent([hardline, ...childrenWithBreaks]), hardline);
+        }
+      }
     }
   }
   
-  // Self-closing tag
-  if (SLASH_CLOSE) {
-    parts.push(" />");
-    return group(parts);
-  }
-  
-  parts.push(START_CLOSE);
-  
-  // Handle content
-  if (content) {
-    const contentDoc = path.call(print, "content");
-    
-    // Convert contentDoc to array if it's not already
-    const contentParts = Array.isArray(contentDoc) ? contentDoc : [contentDoc];
-    
-    if (contentParts.length > 0 && contentParts.some(part => part && part !== "")) {
-       // Check if content should be inlined
-       const hasElements = content.element && content.element.length > 0;
-       const hasOnlySimpleText = content.chardata && content.chardata.length > 0 && 
-         content.chardata.every(cd => {
-           const text = cd.TEXT || cd.SEA_WS || "";
-           return text.trim().length < 50 && !text.includes("\n");
-         });
-       
-       const shouldInline = !hasElements && hasOnlySimpleText;
-       
-       if (shouldInline) {
-         // For inline content
-         parts.push(...contentParts);
-       } else {
-         // For block content
-         parts.push(indent([hardline, ...contentParts]), hardline);
-       }
-     }
-  }
-  
-  // Closing tag
-  if (END_NAME) {
-    parts.push(SLASH_OPEN, END_NAME, END);
+  // Print end tag
+  if (node.endTag) {
+    parts.push(path.call(print, "endTag"));
   }
   
   return group(parts);
@@ -412,58 +327,36 @@ function printElement(path, opts, print) {
 
 function printDocument(path, opts, print) {
   const node = path.getValue();
-  const { element, misc } = node;
+  const { body } = node;
   
-  // Create a list of all items (elements and comments) with their positions
-  const allItems = [];
-  
-  if (element) {
-    element.forEach((el, index) => {
-      allItems.push({
-        type: 'element',
-        index,
-        startOffset: el.location ? el.location.startOffset : 0,
-        node: el
-      });
-    });
+  if (!body || body.length === 0) {
+    return "";
   }
-  
-  if (misc) {
-    misc.forEach((miscNode, index) => {
-      allItems.push({
-        type: 'misc',
-        index,
-        startOffset: miscNode.location ? miscNode.location.startOffset : 0,
-        node: miscNode
-      });
-    });
-  }
-  
-  // Sort by position to maintain original order
-  allItems.sort((a, b) => a.startOffset - b.startOffset);
   
   const parts = [];
+  let lastWasElement = false;
   
-  allItems.forEach((item, itemIndex) => {
-    let printed;
-    
-    if (item.type === 'element') {
-      printed = path.call(print, "element", item.index);
-    } else {
-      printed = path.call(print, "misc", item.index);
-    }
+  body.forEach((child, index) => {
+    const printed = path.call(print, "body", index);
+    const isElement = child.type === 'WXElement'; // 正确检查是否是元素节点
     
     if (printed && printed !== "") {
-      if (parts.length > 0) {
+      // 只在两个元素节点之间添加换行
+      if (parts.length > 0 && isElement && lastWasElement) {
         parts.push(hardline);
       }
       parts.push(printed);
+    }
+    
+    // 更新 lastWasElement，只有当节点有实际输出时才更新
+    if (printed && printed !== "") {
+      lastWasElement = isElement;
     }
   });
   
   if (parts.length > 0) {
     parts.push(hardline);
-    return parts;
+    return join("", parts);
   }
   
   return "";
@@ -471,7 +364,7 @@ function printDocument(path, opts, print) {
 
 function printComment(path, opts, print) {
   const node = path.getValue();
-  return node.image;
+  return `<!--${node.value}-->`;
 }
 
 const printer = {
@@ -500,21 +393,27 @@ const printer = {
       }
     }
     
-    switch (node.name) {
-      case "attribute":
+    switch (node.type) {
+      case "WXAttribute":
         return printAttribute(path, opts, print);
-      case "chardata":
+      case "WXCharData":
         return printCharData(path, opts, print);
-      case "content":
+      case "WXContent":
         return printContent(path, opts, print);
-      case "document":
+      case "Program":
         return printDocument(path, opts, print);
-      case "element":
+      case "WXElement":
         return printElement(path, opts, print);
-      case "Comment":
+      case "WXComment":
         return printComment(path, opts, print);
-      case "misc":
+      case "WXScript":
         return printMisc(path, opts, print);
+      case "WXStartTag":
+        return printStartTag(path, opts, print);
+      case "WXEndTag":
+        return printEndTag(path, opts, print);
+      case "WXText":
+        return printCharData(path, opts, print);
       default:
         // For simple tokens, just return their value
         return node.image || "";
@@ -522,16 +421,119 @@ const printer = {
   }
 };
 
-function printMisc(path, opts, print) {
+function printStartTag(path, opts, print) {
   const node = path.getValue();
-  const { Comment, PROCESSING_INSTRUCTION, SEA_WS } = node;
+  const parts = [`<${node.name}`];
   
-  if (Comment) {
-    return Comment;
+  if (node.attributes && node.attributes.length > 0) {
+    const attributeDocs = [];
+    for (let i = 0; i < node.attributes.length; i++) {
+      attributeDocs.push(path.call(print, "attributes", i));
+    }
+    
+    // Calculate approximate length to decide if we need to break
+    const printWidth = opts.wxmlPrintWidth || opts.printWidth || 80;
+    const tagName = node.name;
+    const approximateLength = tagName.length + 2; // < and >
+    
+    // Estimate attribute lengths (rough approximation)
+    let attributesLength = 0;
+    if (node.attributes) {
+      attributesLength = node.attributes.reduce((sum, attr) => {
+        const keyLength = attr.key ? attr.key.length : 0;
+        const valueLength = attr.value ? attr.value.length + 3 : 0; // +3 for =""
+        return sum + keyLength + valueLength + 1; // +1 for space
+      }, 0);
+    }
+    
+    if (approximateLength + attributesLength > printWidth) {
+         // Break attributes to multiple lines
+         const indentedAttributes = indent([
+           softline,
+           join(hardline, attributeDocs)
+         ]);
+         parts.push(indentedAttributes, hardline);
+       } else {
+         // Keep on same line
+         parts.push(" ", join(" ", attributeDocs));
+       }
   }
   
-  if (PROCESSING_INSTRUCTION) {
-    return PROCESSING_INSTRUCTION;
+  if (node.selfClosing) {
+    parts.push(" />");
+  } else {
+    parts.push(">");
+  }
+  
+  return parts;
+}
+
+function printEndTag(path, opts, print) {
+  const node = path.getValue();
+  return `</${node.name}>`;
+}
+
+function printMisc(path, opts, print) {
+  const node = path.getValue();
+  
+  // Handle WXScript nodes
+  if (node.type === "WXScript") {
+    let result = "";
+    
+    // Print start tag manually
+    if (node.startTag) {
+      result += `<${node.startTag.name}`;
+      if (node.startTag.attributes && node.startTag.attributes.length > 0) {
+        for (const attr of node.startTag.attributes) {
+          result += ` ${attr.key}="${attr.value}"`;
+        }
+      }
+      result += ">";
+    }
+    
+    // Print content with proper JavaScript formatting
+    if (node.value) {
+      result += "\n";
+      // Apply basic JavaScript formatting rules
+      let jsCode = node.value.trim();
+      
+      // Add space before function parentheses: function( -> function (
+      jsCode = jsCode.replace(/function\s*\(/g, 'function (');
+      
+      // Handle semicolons based on options
+       if (opts.wxsSemi === false) {
+         // Remove semicolons at end of lines
+         jsCode = jsCode.replace(/;\s*$/gm, '');
+       } else {
+         // Ensure semicolons at end of statements (but not before { or after })
+         jsCode = jsCode.replace(/([^;\s{}])\s*$/gm, (match, p1) => {
+           // Don't add semicolon if line ends with { or }
+           if (p1 === '{' || p1 === '}') return match;
+           return p1 + ';';
+         });
+       }
+      
+      // Handle quotes based on options
+      if (opts.wxsSingleQuote !== false) {
+        // Convert double quotes to single quotes for strings
+        jsCode = jsCode.replace(/"([^"]*)"/g, "'$1'");
+      }
+      
+      // Split into lines and add indentation
+      const lines = jsCode.split('\n');
+      const indentedLines = lines.map(line => 
+        line.trim() ? `  ${line}` : line
+      );
+      result += indentedLines.join('\n');
+      result += "\n";
+    }
+    
+    // Print end tag manually
+    if (node.endTag) {
+      result += `</${node.endTag.name}>`;
+    }
+    
+    return result;
   }
   
   return "";
