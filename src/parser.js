@@ -32,11 +32,28 @@ function simplifyCST(node) {
     case "attribute": {
       const { Name, EQUALS, STRING } = node.children;
 
+      // Handle boolean attributes (no EQUALS or STRING)
+      if (!EQUALS || !STRING) {
+        return {
+          name: "attribute",
+          Name: Name[0].image,
+          EQUALS: null,
+          STRING: null,
+          isBooleanAttr: true,
+          location: node.location
+        };
+      }
+
+      // Check if this is a boolean attribute placeholder
+      const stringValue = STRING[0].image;
+      const isBooleanPlaceholder = stringValue && stringValue.includes('__BOOLEAN_ATTR_');
+
       return {
         name: "attribute",
         Name: Name[0].image,
         EQUALS: EQUALS[0].image,
-        STRING: STRING[0].image,
+        STRING: stringValue,
+        isBooleanAttr: isBooleanPlaceholder,
         location: node.location
       };
     }
@@ -203,7 +220,7 @@ function simplifyCST(node) {
   }
 }
 
-// Pre-process template expressions to avoid XML parsing issues
+// Pre-process template expressions and boolean attributes to avoid XML parsing issues
 function preprocessTemplateExpressions(text) {
   const protectedItems = [];
   let processedText = text;
@@ -236,6 +253,34 @@ function preprocessTemplateExpressions(text) {
     return placeholder;
   });
   
+  // Handle boolean attributes by converting them to standard XML format
+  let booleanIndex = 0;
+  // Match attributes that are followed by whitespace and then > or />, but not by =
+  processedText = processedText.replace(/\s+([a-zA-Z][a-zA-Z0-9-]*)(?=\s*[/>])/g, (match, attrName) => {
+    const placeholder = `__BOOLEAN_ATTR_${booleanIndex}__`;
+    protectedItems.push({
+      placeholder,
+      content: attrName,
+      original: attrName,
+      type: 'BOOLEAN_ATTR'
+    });
+    booleanIndex++;
+    return ` ${attrName}="${placeholder}"`;
+  });
+  
+  // Also handle boolean attributes that are followed by other attributes
+  processedText = processedText.replace(/\s+([a-zA-Z][a-zA-Z0-9-]*)(?=\s+[a-zA-Z][a-zA-Z0-9-]*=)/g, (match, attrName) => {
+    const placeholder = `__BOOLEAN_ATTR_${booleanIndex}__`;
+    protectedItems.push({
+      placeholder,
+      content: attrName,
+      original: attrName,
+      type: 'BOOLEAN_ATTR'
+    });
+    booleanIndex++;
+    return ` ${attrName}="${placeholder}"`;
+  });
+  
   return { processedText, protectedItems };
 }
 
@@ -258,11 +303,16 @@ function restoreProtectedContent(node, protectedItems) {
   
   if (node.STRING) {
     protectedItems.forEach(({ placeholder, content, original, type }) => {
-      if (node.STRING.includes(placeholder)) {
+      if (node.STRING && node.STRING.includes(placeholder)) {
         if (type === 'WXS_CONTENT') {
           node.STRING = node.STRING.replace(placeholder, content);
         } else if (type === 'TEMPLATE_EXPR') {
           node.STRING = node.STRING.replace(placeholder, original);
+        } else if (type === 'BOOLEAN_ATTR') {
+          // For boolean attributes, mark them for special handling
+          node.STRING = null;
+          node.EQUALS = null;
+          node.isBooleanAttr = true;
         }
       }
     });
