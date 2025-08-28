@@ -15,30 +15,30 @@ exports[`Format > should format multi-root fixture 1`] = `
 exports[`Format > should handle complex expressions 1`] = `
 "<root>
   <!-- 基本逻辑运算符 -->
-  <!-- 多重 OR 运算符 -->
-  <!-- 链式访问与数组访问 -->
-  <!-- 否定运算符与混合逻辑 -->
-  <!-- 对象属性链式访问 -->
-  <!-- 复杂条件判断 -->
-  <!-- 重复数组访问组合（已修复） -->
   <view class="{{data && data.list}}">
     <text>{{user.name || 'Anonymous'}}</text>
   </view>
+  <!-- 多重 OR 运算符 -->
   <view>
     <text>{{user.name || user.nickname || 'Anonymous'}}</text>
   </view>
+  <!-- 链式访问与数组访问 -->
   <view class="{{data && data.list && data.list[0]}}">
     <text>{{array[index].name || 'default'}}</text>
   </view>
+  <!-- 否定运算符与混合逻辑 -->
   <view wx:if="{{condition1 && condition2 && !condition3}}">
     <text>{{title || subtitle || 'No title'}}</text>
   </view>
+  <!-- 对象属性链式访问 -->
   <view data-value="{{obj.prop1 && obj.prop1.prop2 || defaultValue}}">
     <text>{{config.theme.color || 'blue'}}</text>
   </view>
+  <!-- 复杂条件判断 -->
   <view wx:if="{{user && user.isActive && !user.isBlocked}}">
     <text>{{user.profile.displayName || user.username}}</text>
   </view>
+  <!-- 重复数组访问组合（已修复） -->
   <view class="{{array[index] && array[index].className}}">
     <text>
       {{array[index] && array[index].prop || 'default'}}
@@ -54,14 +54,16 @@ exports[`Format > should handle complex expressions 1`] = `
 exports[`Format > should handle ignore comments - block 1`] = `
 "<root>
   <view class="normal">normal formatting</view>
+  <!-- prettier-ignore-start -->
   
 
   <view class="messy-formatting"    id="test">
     <text>ignored content</text>
       <view>nested   element</view>
-  </view
+  </view>
   
 
+  <!-- prettier-ignore-end -->
   <view class="normal-again">normal formatting again</view>
 </root>
 "
@@ -70,9 +72,15 @@ exports[`Format > should handle ignore comments - block 1`] = `
 exports[`Format > should handle ignore comments - simple 1`] = `
 "<root>
   <!-- prettier-ignore -->
-  <view class="messy-formatting" id="test">
+  <!-- prettier-ignore -->
+  <view class="messy-formatting"       id="test"    >
     <text>simple text</text>
   </view>
+  <!-- prettier-ignore -->
+  <view class="messy-formatting"       id="test"    >
+    <text>simple text</text>
+  </view>
+
   <view class="normal">
     <text>normal formatting</text>
   </view>

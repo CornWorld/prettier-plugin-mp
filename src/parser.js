@@ -14,6 +14,20 @@ function createError(message, options) {
 }
 
 function simplifyCST(node) {
+  // Handle tokens that don't have a name property
+  if (!node.name && node.tokenType && node.tokenType.name === "Comment") {
+    return {
+      name: "Comment",
+      image: node.image,
+      startOffset: node.startOffset,
+      endOffset: node.endOffset,
+      location: {
+        startOffset: node.startOffset,
+        endOffset: node.endOffset
+      }
+    };
+  }
+  
   switch (node.name) {
     case "attribute": {
       const { Name, EQUALS, STRING } = node.children;
@@ -77,7 +91,18 @@ function simplifyCST(node) {
         docTypeDecl: docTypeDecl ? simplifyCST(docTypeDecl[0]) : null,
         element: element ? element.map(simplifyCST) : [],
         misc: (misc || [])
-          .filter((child) => !child.children.SEA_WS)
+          .filter((child) => {
+            // Keep comments and other meaningful content, only filter pure whitespace
+            if (child.children && child.children.Comment) {
+              return true;
+            }
+            if (child.children && child.children.PROCESSING_INSTRUCTION) {
+              return true;
+            }
+            // Filter out nodes that only contain whitespace
+            const isOnlyWhitespace = child.children && child.children.SEA_WS && Object.keys(child.children).length === 1;
+            return !isOnlyWhitespace;
+          })
           .map(simplifyCST),
         prolog: prolog ? simplifyCST(prolog[0]) : null,
         location: node.location
@@ -162,7 +187,10 @@ function simplifyCST(node) {
         image: node.image,
         startOffset: node.startOffset,
         endOffset: node.endOffset,
-        location: node.location
+        location: {
+          startOffset: node.startOffset,
+          endOffset: node.endOffset
+        }
       };
     }
     default: {
@@ -205,7 +233,7 @@ function preprocessTemplateExpressions(text) {
       type: 'TEMPLATE_EXPR'
     });
     templateIndex++;
-    return `{{${placeholder}}}`;
+    return placeholder;
   });
   
   return { processedText, protectedItems };
@@ -222,7 +250,7 @@ function restoreProtectedContent(node, protectedItems) {
         if (type === 'WXS_CONTENT') {
           node.TEXT = node.TEXT.replace(placeholder, content);
         } else if (type === 'TEMPLATE_EXPR') {
-          node.TEXT = node.TEXT.replace(`{{${placeholder}}}`, original);
+          node.TEXT = node.TEXT.replace(placeholder, original);
         }
       }
     });
@@ -234,7 +262,7 @@ function restoreProtectedContent(node, protectedItems) {
         if (type === 'WXS_CONTENT') {
           node.STRING = node.STRING.replace(placeholder, content);
         } else if (type === 'TEMPLATE_EXPR') {
-          node.STRING = node.STRING.replace(`{{${placeholder}}}`, original);
+          node.STRING = node.STRING.replace(placeholder, original);
         }
       }
     });
@@ -365,13 +393,35 @@ const parser = {
           // Extract child elements from the virtual root
           const childElements = [];
           if (rootElement.content && rootElement.content.element) {
+            // content.element is an array of elements
             childElements.push(...rootElement.content.element);
           }
           // Create a new document with multiple root elements
+          // Preserve misc comments from the original wrapped document
+          let documentMisc = ast.misc || [];
+          
+          // Extract comments from the root element's content
+          if (rootElement.content) {
+            // Convert content comments to misc format
+            if (rootElement.content.Comment && rootElement.content.Comment.length > 0) {
+              const contentComments = rootElement.content.Comment.map(comment => ({
+                name: 'misc',
+                Comment: comment.image,
+                location: comment.location
+              }));
+              documentMisc = [...documentMisc, ...contentComments];
+            }
+            
+            // Also check for misc if it exists
+            if (rootElement.content.misc) {
+              documentMisc = [...documentMisc, ...rootElement.content.misc];
+            }
+          }
+          
           ast = {
             name: 'document',
             element: childElements,
-            misc: ast.misc || [],
+            misc: documentMisc,
             docTypeDecl: ast.docTypeDecl || null,
             prolog: ast.prolog || null,
             location: ast.location
