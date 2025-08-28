@@ -65,7 +65,12 @@ function isWhitespaceIgnorable(content) {
 
 function printAttribute(path, opts, print) {
   const node = path.getValue();
-  const { Name, EQUALS, STRING } = node;
+  const { Name, EQUALS, STRING, isBooleanAttr } = node;
+  
+  // Handle boolean attributes (no value)
+  if (isBooleanAttr || !EQUALS || !STRING) {
+    return Name;
+  }
   
   // Handle quote style for WXML
   let attributeValue = STRING;
