@@ -49,13 +49,6 @@ const plugin = {
       default: 2,
       description: "Number of spaces per indentation level in WXS code.",
       range: { start: 0, end: Infinity, step: 1 }
-    },
-    // New option to control using Prettier for JS inside <wxs>
-    wxsUsePrettierForJs: {
-      type: "boolean",
-      category: "WXS",
-      default: false,
-      description: "Use Prettier (babel parser) to format JavaScript inside <wxs> blocks; falls back to conservative formatter on failure. This is experimental and disabled by default."
     }
   },
   defaultOptions: {

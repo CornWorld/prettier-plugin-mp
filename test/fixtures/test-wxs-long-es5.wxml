@@ -19,15 +19,12 @@ var DEFAULTS = {
 // simple helpers
 function repeat(str, n) {
   var out = ''
-  for (var i = 0; i < n; i++) {
-    out = out + str
+  for (var i = 0; i < n; i++) { out = out + str
   }
   return out
 }
 
-var identity = function (x) {
-  return x
-}
+var identity = function (x) { return x }
 
 var not = function (fn) {
   return function (x) {

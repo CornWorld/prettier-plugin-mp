@@ -412,118 +412,107 @@ exports[`Format > should handle long ES5 WXS code 1`] = `
     map: {
       a: 1,
       b: 2,
-      c: 3 
+      c: 3
     },
-    list: [1, 2, 3, 4, 5, 6, 7
-    , 8,
-     9, /*only for test*/
-      10]
+    list: [1, 2, 3, 4, 5, 6, 7, 8, 9, /*only for test*/
+    10]
   };
 
   // simple helpers
   function repeat(str, n) {
-    var out = ''
+    var out = '';
     for (var i = 0; i < n; i++) {
-      out = out + str
+      out = out + str;
     }
-    return out
+    return out;
   }
-
   var identity = function (x) {
-    return x
-  }
-
+    return x;
+  };
   var not = function (fn) {
     return function (x) {
-      return !fn(x)
-    }
-  }
-
+      return !fn(x);
+    };
+  };
   var isEven = function (n) {
-    return n % 2 === 0
-  }
-
+    return n % 2 === 0;
+  };
   var double = function (n) {
-    return n * 2
-  }
+    return n * 2;
+  };
 
   // collection helpers
   var filter = function (arr, pred) {
-    var out = []
+    var out = [];
     for (var i = 0; i < arr.length; i++) {
       if (pred(arr[i], i)) {
-        out.push(arr[i])
+        out.push(arr[i]);
       }
     }
-    return out
-  }
-
+    return out;
+  };
   var map = function (arr, fn) {
-    var out = []
+    var out = [];
     for (var i = 0; i < arr.length; i++) {
-      out.push(fn(arr[i], i))
+      out.push(fn(arr[i], i));
     }
-    return out
-  }
-
+    return out;
+  };
   var reduce = function (arr, fn, init) {
-    var acc = init
+    var acc = init;
     for (var i = 0; i < arr.length; i++) {
-      acc = fn(acc, arr[i], i)
+      acc = fn(acc, arr[i], i);
     }
-    return acc
-  }
+    return acc;
+  };
 
   // formatter with mixed line endings
   var format = function (num, opts) {
-    opts = opts || {}
-    var currency = (opts.currency || DEFAULTS.currency)
-    var precision = (
-      typeof opts.precision === 'number'
-        ? opts.precision
-        : DEFAULTS.precision
-    )
-    var sign = num < 0 ? '-' : ''
-    var abs = Math.abs(num)
-    var s = String(
-      Math.round(abs * Math.pow(10, precision)) / Math.pow(10, precision)
-    )
-    var idx = s.indexOf('.')
+    opts = opts || {};
+    var currency = opts.currency || DEFAULTS.currency;
+    var precision = typeof opts.precision === 'number' ? opts.precision : DEFAULTS.precision;
+    var sign = num < 0 ? '-' : '';
+    var abs = Math.abs(num);
+    var s = String(Math.round(abs * Math.pow(10, precision)) / Math.pow(10, precision));
+    var idx = s.indexOf('.');
     if (idx === -1) {
-      s = s + '.' + repeat('0', precision)
+      s = s + '.' + repeat('0', precision);
     } else {
-      var need = precision - (s.length - idx - 1)
+      var need = precision - (s.length - idx - 1);
       if (need > 0) {
-        s = s + repeat('0', need)
+        s = s + repeat('0', need);
       }
     }
-    return sign + currency + ' ' + s
-  }
+    return sign + currency + ' ' + s;
+  };
 
   // function composition (keep as one line to avoid arg-list trailing issues)
-  var pipe = function () { var fns = arguments; return function (x) { var res = x; for (var i = 0; i < fns.length; i++) { res = fns[i](res) } return res } }
+  var pipe = function () {
+    var fns = arguments;
+    return function (x) {
+      var res = x;
+      for (var i = 0; i < fns.length; i++) {
+        res = fns[i](res);
+      }
+      return res;
+    };
+  };
 
   // complex consumer with conditionals
   var complex = function (user) {
-    var baseList = (user && user.scores)
-      ? user.scores
-      : DEFAULTS.list
+    var baseList = user && user.scores ? user.scores : DEFAULTS.list;
     var scores = map(baseList, function (v) {
-      return v * (
-        user && user.multiplier
-          ? user.multiplier
-          : 1
-      )
-    })
-    var evens = filter(scores, isEven)
+      return v * (user && user.multiplier ? user.multiplier : 1);
+    });
+    var evens = filter(scores, isEven);
     var total = reduce(evens, function (acc, v) {
-      return acc + v
-    }, 0)
+      return acc + v;
+    }, 0);
     return format(total, {
       currency: user && user.currency,
       precision: 2
-    })
-  }
+    });
+  };
 
   // many statements to trigger semicolon insertion only where needed
   var obj = {
@@ -532,65 +521,52 @@ exports[`Format > should handle long ES5 WXS code 1`] = `
     deep: {
       x: 10,
       y: 20,
-      z: { k: 30 }
+      z: {
+        k: 30
+      }
     }
-  }
-
-  obj.a = obj.a + 1
-  obj['b'] = obj['b'] + 2
-
+  };
+  obj.a = obj.a + 1;
+  obj['b'] = obj['b'] + 2;
   if (obj.a > 1) {
-    obj.flag = true
+    obj.flag = true;
   } else {
-    obj.flag = false
+    obj.flag = false;
   }
-
   for (var i = 0; i < 5; i++) {
-    obj.sum = (obj.sum || 0) + i
+    obj.sum = (obj.sum || 0) + i;
   }
 
   // loops and try-catch-finally
-  var j = 0
+  var j = 0;
   while (j < 3) {
     if (j === 1) {
-      j = j + 1
-      continue
+      j = j + 1;
+      continue;
     }
-    j = j + 1
+    j = j + 1;
   }
-
   try {
-    var r = /[a-zA-Z_][a-zA-Z0-9_]*/g
+    var r = /[a-zA-Z_][a-zA-Z0-9_]*/g;
   } catch (e) {
-    obj.err = e && e.message
+    obj.err = e && e.message;
   } finally {
-    obj.done = true
+    obj.done = true;
   }
 
   // object and array literals multi-line
-  var arr = [
-    1,
-    2,
-    3,
-    4,
-    5
-  ]
-
-  var tuple = [
-    obj.a,
-    obj.b,
-    obj.deep && obj.deep.x
-  ]
+  var arr = [1, 2, 3, 4, 5];
+  var tuple = [obj.a, obj.b, obj.deep && obj.deep.x];
 
   // call chains split by line but ending with closing paren
   var res = pipe(function (x) {
-    return x + 1
+    return x + 1;
   }, double)(10)
 
   // IIFE
   (function () {
-    obj.init = true
-  }())
+    obj.init = true;
+  }());
 
   // export
   module.exports = {
@@ -599,19 +575,15 @@ exports[`Format > should handle long ES5 WXS code 1`] = `
     format: format,
     sum: function (xs) {
       return reduce(xs, function (acc, v) {
-        return acc + (
-          typeof v === 'number'
-            ? v
-            : 0
-        )
-      }, 0)
+        return acc + (typeof v === 'number' ? v : 0);
+      }, 0);
     },
     complex: complex,
     identity: identity,
     not: not,
     isEven: isEven,
     double: double
-  }
+  };
 </wxs><view>
   <text></text>
   <text>
@@ -638,16 +610,16 @@ exports[`Format > should handle wxs embed 1`] = `
 "<root>
   <wxs module="utils">
   var formatPrice = function (price) {
-        if (!price) return '--';
-        return '¥' + price.toFixed(2);
-      };
-      var isValid = function (user) {
-        return user ? true : false;
-      };
-      module.exports = {
-        formatPrice: formatPrice,
-        isValid: isValid
-      };
+    if (!price) return '--';
+    return '¥' + price.toFixed(2);
+  };
+  var isValid = function (user) {
+    return user ? true : false;
+  };
+  module.exports = {
+    formatPrice: formatPrice,
+    isValid: isValid
+  };
 </wxs>
   <view class="{{data}}">
     <text>{{utils.formatPrice(item.price)}}</text>
