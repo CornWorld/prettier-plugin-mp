@@ -107,4 +107,19 @@ describe("Format", () => {
     const result = await formatWxml(content);
     expect(result).toMatchSnapshot();
   });
+
+  it("should format number utilities WXS fixture", async () => {
+    const content = readFileSync(join(__dirname, "fixtures/test-wxs-number-format.wxml"), "utf8");
+    const result = await formatWxml(content, { printWidth: 80, wxsSingleQuote: true, wxsSemi: true });
+    expect(result).toMatchSnapshot();
+  });
+
+  it("should accept Babel options via Prettier rc for <wxs>", async () => {
+    const content = `<wxs module="m">var a=1;/* dummy */</wxs>`; // minimal valid WXS content
+    const result = await formatWxml(content, {
+      wxsBabelParserOptions: JSON.stringify({ allowReturnOutsideFunction: true }),
+      wxsBabelGeneratorOptions: JSON.stringify({ retainLines: false })
+    });
+    expect(typeof result).toBe('string');
+  });
 });

@@ -1,0 +1,98 @@
+<wxs module="fn"> 
+     // 添加千分位分隔符 
+     function addComma(num) { 
+         var parts = num.toString().split("."); 
+         parts[0] = parts[0].replace(getRegExp('\\B(?=(\\d{3})+(?!\\d))', 'g'), ","); 
+         return parts.join("."); 
+     } 
+     
+     // 大数分割 
+     function splitBig(value, fixed) { 
+         fixed = fixed || 2; 
+         var units = [ 
+             {key: '亿', value: 100000000}, 
+             {key: '万', value: 10000} 
+         ]; 
+         var unitKey = ''; 
+         var unitValue = 1; 
+         
+         // 找到合适的单位 
+         for (var i = 0; i < units.length; i++) { 
+             if (value >= units[i].value) { 
+                 unitKey = units[i].key; 
+                 unitValue = units[i].value; 
+                 break; 
+             } 
+         } 
+         
+         if (!unitKey) { 
+             return [value.toString(), '']; 
+         } 
+         
+         var result = (value / unitValue).toFixed(fixed); 
+         return [result, unitKey]; 
+     } 
+     
+     // 统一格式化函数 
+     function formatNum(value, opts) { 
+         opts = opts || {}; 
+         var unit = opts.unit; 
+         
+         // 处理无效值 
+         if (value === null || value === undefined || isNaN(value)) { 
+             return opts.asArray ? ['-', ''] : '-'; 
+         } 
+         
+         // 单位转换：¥需要除以100（分转元） 
+         var processedValue = value; 
+         if (unit === '¥') { 
+             processedValue = value / 100; 
+         } 
+         
+         // 大数处理 
+         if (opts.big) { 
+             var bigResult = splitBig(processedValue, opts.fixed); 
+             if (unit && bigResult[0] !== '-') { 
+                 return opts.asArray ? [unit + ' ' + bigResult[0], bigResult[1]] : unit + ' ' + bigResult[0] + bigResult[1]; 
+             } 
+             return opts.asArray ? bigResult : bigResult[0] + bigResult[1]; 
+         } 
+         
+         // 范围处理 
+         if (opts.range && opts.range.length === 2) { 
+             var left = opts.range[0]; 
+             var right = opts.range[1]; 
+             
+             // 单位转换 
+             if (unit === '¥') { 
+                 left = left / 100; 
+                 right = right / 100; 
+             } 
+             
+             if (Math.abs(right - left) < 0.000001) { 
+                 var sameResult = addComma(left.toFixed(opts.fixed || 2)); 
+                 var sameFormatted = unit ? unit + ' ' + sameResult : sameResult; 
+                 return opts.asArray ? ['均为 ' + sameFormatted, ''] : '均为 ' + sameFormatted; 
+             } else { 
+                 var leftFormatted = addComma(left.toFixed(opts.fixed || 2)); 
+                 var rightFormatted = addComma(right.toFixed(opts.fixed || 2)); 
+                 if (unit) { 
+                     leftFormatted = unit + ' ' + leftFormatted; 
+                     rightFormatted = unit + ' ' + rightFormatted; 
+                 } 
+                 var rangeResult = leftFormatted + '-' + rightFormatted; 
+                 return opts.asArray ? [rangeResult, ''] : rangeResult; 
+             } 
+         } 
+         
+         // 基础格式化 
+         var formatted = addComma(processedValue.toFixed(opts.fixed || 2)); 
+         var result = unit ? unit + ' ' + formatted : formatted; 
+         
+         return opts.asArray ? [result, ''] : result; 
+     } 
+ 
+     module.exports = { 
+         formatNum: formatNum 
+     } 
+ </wxs>

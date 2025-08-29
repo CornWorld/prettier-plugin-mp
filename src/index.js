@@ -49,6 +49,19 @@ const plugin = {
       default: 2,
       description: "Number of spaces per indentation level in WXS code.",
       range: { start: 0, end: Infinity, step: 1 }
+    },
+    // Advanced: pass through Babel options for <wxs> formatting via Prettier rc (as JSON string)
+    wxsBabelParserOptions: {
+      type: "string",
+      category: "WXS",
+      default: undefined,
+      description: "Advanced: JSON string for @babel/parser options used for parsing <wxs> JavaScript. E.g., '{\"plugins\":[\"optionalChaining\"]}'"
+    },
+    wxsBabelGeneratorOptions: {
+      type: "string",
+      category: "WXS",
+      default: undefined,
+      description: "Advanced: JSON string for @babel/generator options used for emitting <wxs> JavaScript."
     }
   },
   defaultOptions: {
