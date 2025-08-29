@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
 import prettier from "prettier";
-import { readFileSync } from "fs";
-import { join } from "path";
 import * as plugin from "../src/index.js";
 
 async function formatWxml(source, options = {}) {
@@ -67,19 +65,19 @@ module.exports.message = msg;
     });
   });
 
-  describe("wxsUsePrettierForJs option", () => {
-    it("should use Prettier for valid JS in <wxs>", async () => {
+  describe("<wxs> JavaScript formatting (always on)", () => {
+    it("should use parser for valid JS in <wxs>", async () => {
       const source = `<wxs module=\"m1\">\nvar a=1;function f(x){return x+1}\nmodule.exports={a:a, f:f}\n</wxs>`;
       const expected = `<wxs module=\"m1\">\n  var a = 1;\n  function f(x) {\n    return x + 1;\n  }\n  module.exports = {\n    a: a,\n    f: f\n  };\n</wxs>\n`;
-      const result = await formatWxml(source, { wxsUsePrettierForJs: true });
+      const result = await formatWxml(source, {});
       expect(result).toBe(expected);
     });
 
-    it("should gracefully fallback for invalid JS in <wxs>", async () => {
+    it("should throw for invalid JS in <wxs>", async () => {
       // Intentionally invalid JS to force parser error
       const invalid = `<wxs module="m1">\nvar a = ;\nfunction (x) {\n  return x+1;\n}\n</wxs>`;
-      await expect(formatWxml(invalid, { wxsUsePrettierForJs: true }))
-        .rejects.toThrow(/Failed to parse\/format <wxs> JavaScript with wxsUsePrettierForJs=true/);
+      await expect(formatWxml(invalid, {}))
+        .rejects.toThrow(/Failed to parse\/format <wxs> JavaScript/);
     });
   });
 });

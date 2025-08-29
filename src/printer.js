@@ -3,19 +3,10 @@ import prettier from "prettier";
 import { parse } from "@babel/parser";
 import generate from "@babel/generator";
 
-const { group, hardline, indent, join, line, softline, ifBreak } = doc.builders;
+const { group, hardline, indent, join, line, softline /*, ifBreak*/ } = doc.builders;
 
 const ignoreStartComment = "<!-- prettier-ignore-start -->";
 const ignoreEndComment = "<!-- prettier-ignore-end -->";
-
-function hasIgnoreRanges(comments) {
-  if (comments.length === 0) {
-    return false;
-  }
-  
-  // Reuse buildIgnoreRanges logic to avoid duplication
-  return buildIgnoreRanges(null, comments).length > 0;
-}
 
 function buildIgnoreRanges(ast, comments) {
   const ranges = [];
@@ -39,9 +30,6 @@ function buildIgnoreRanges(ast, comments) {
   return ranges;
 }
 
-// Template expression regex for {{ }} patterns
-const TEMPLATE_EXPR_REGEX = /\{\{[^}]*\}\}/g;
-
 function printAttribute(path, opts, print) {
   const node = path.getValue();
   const { key, value, rawValue } = node;
@@ -51,19 +39,144 @@ function printAttribute(path, opts, print) {
     return key;
   }
   
-  // Use rawValue (restored content) if available, otherwise use value
-  let attributeValue = rawValue || value;
+  // Normalize attribute value quoting per wxmlSingleQuote
+  let attributeValue = rawValue != null ? rawValue : value;
+  if (typeof attributeValue === "string") {
+    attributeValue = normalizeAttrValueForWxmlQuotes(attributeValue, opts);
+  }
   
-  // Ensure proper quoting for attribute values
-  if (!attributeValue.startsWith('"') && !attributeValue.startsWith("'")) {
-    // Value doesn't have quotes, add them based on preference
-    if (opts.wxmlSingleQuote) {
-      attributeValue = `'${attributeValue}'`;
+  return `${key}=${attributeValue}`;
+}
+
+function printStartTag(path, opts, print) {
+  const node = path.getValue();
+  const parts = ["<", node.name];
+
+  if (node.attributes && node.attributes.length > 0) {
+    const attributeDocs = node.attributes.map((attr) => {
+      return printAttribute({ getValue: () => attr }, opts, print);
+    });
+
+    // Calculate approximate length to decide line breaks
+    const attributesLength = attributeDocs.reduce((sum, current) => sum + String(current).length + 1, 0);
+    const printWidth = (typeof opts.wxmlPrintWidth === 'number') ? opts.wxmlPrintWidth : (opts.printWidth || 80);
+    const approximateLength = node.name.length + 1 + attributesLength; // "<" + name + space + attrs
+
+    const shouldBreak = approximateLength > printWidth || (node.selfClosing && node.attributes.length >= 4);
+
+    if (shouldBreak) {
+      // Break attributes to multiple lines
+      const indentedAttributes = indent([
+        softline,
+        join(hardline, attributeDocs)
+      ]);
+      parts.push(indentedAttributes, hardline);
     } else {
-      attributeValue = `"${attributeValue}"`;
+      // Keep on same line
+      parts.push(" ", join(" ", attributeDocs));
     }
+  }
+
+  if (node.selfClosing) {
+    parts.push(" />");
   } else {
-    // Handle quote style conversion for already quoted values
+    parts.push(">");
+  }
+
+  return parts;
+}
+
+function printEndTag(path, opts, print) {
+  const node = path.getValue();
+  return `</${node.name}>`;
+}
+
+// Quick syntax check via Babel to avoid Prettier throwing parser errors
+function canParseWithBabel(jsCode) {
+  try {
+    parse(jsCode, {
+      sourceType: 'script',
+      allowReturnOutsideFunction: true,
+      allowAwaitOutsideFunction: true,
+      allowSuperOutsideMethod: true
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Use Prettier to format JS inside <wxs>
+function formatWxsByPrettier(jsCode, opts) {
+  const semi = opts.wxsSemi !== false; // default true
+  const singleQuote = opts.wxsSingleQuote !== false; // default true
+  const tabWidth = typeof opts.wxsTabWidth === 'number' ? opts.wxsTabWidth : (opts.tabWidth || 2);
+  const printWidth = typeof opts.wxmlPrintWidth === 'number' ? opts.wxmlPrintWidth : (opts.printWidth || 80);
+  try {
+    // Avoid invoking Prettier when code is syntactically invalid to prevent global errors
+    if (!canParseWithBabel(jsCode)) return null;
+    const formatted = prettier.format(jsCode, {
+      parser: 'babel',
+      semi,
+      singleQuote,
+      tabWidth,
+      printWidth,
+      // isolate to avoid recursive plugin involvement
+      plugins: [],
+      // filename hint helps parser inference and pragma behaviors
+      filepath: 'inline.wxs.js'
+    });
+    return formatted.trimEnd();
+  } catch (e) {
+    return null;
+  }
+}
+
+// Fallback: Use Babel generator to produce stable output close to Prettier
+function formatWxsByBabelCompat(jsCode, opts) {
+  try {
+    const ast = parse(jsCode, {
+      sourceType: 'script',
+      allowReturnOutsideFunction: true,
+      allowAwaitOutsideFunction: true,
+      allowSuperOutsideMethod: true
+    });
+    const useSingle = opts.wxsSingleQuote !== false; // default true
+    const { code } = generate(
+      ast,
+      {
+        comments: true,
+        compact: false,
+        retainLines: false,
+        quotes: useSingle ? 'single' : 'double',
+        jsescOption: { quotes: useSingle ? 'single' : 'double' },
+        semicolons: opts.wxsSemi !== false
+      },
+      jsCode
+    );
+    // Minimal stylistic normalization to match Prettier expectations
+    let pretty = code.replace(/\bfunction\(/g, 'function (');
+    return pretty.trimEnd();
+  } catch (e) {
+    return null;
+  }
+}
+
+function indentLines(text, indentSize) {
+  const pad = " ".repeat(indentSize);
+  return text
+    .split("\n")
+    .map((l) => (l.trim() ? pad + l : l))
+    .join("\n");
+}
+
+function normalizeAttrValueForWxmlQuotes(value, opts) {
+  if (value == null) return null;
+  let attributeValue = String(value);
+  if (!attributeValue.startsWith('"') && !attributeValue.startsWith("'")) {
+    // add quotes
+    attributeValue = opts.wxmlSingleQuote ? `'${attributeValue}'` : `"${attributeValue}"`;
+  } else {
     if (opts.wxmlSingleQuote && attributeValue.startsWith('"') && attributeValue.endsWith('"')) {
       const content = attributeValue.slice(1, -1);
       if (!content.includes("'")) {
@@ -76,291 +189,143 @@ function printAttribute(path, opts, print) {
       }
     }
   }
+  return attributeValue;
+}
+
+function enforceWxsStringQuotes(code, useSingleQuote) {
+  if (typeof code !== 'string') return code;
+  if (useSingleQuote) {
+    // Convert simple double-quoted strings (no quotes or backslashes inside) to single-quoted
+    return code.replace(/"([^"'\\\n\r]*)"/g, "'$1'");
+  } else {
+    // Convert simple single-quoted strings (no quotes or backslashes inside) to double-quoted
+    return code.replace(/'([^"'\\\n\r]*)'/g, '"$1"');
+  }
+}
+
+function printMisc(path, opts, print) {
+  const node = path.getValue();
   
-  return `${key}=${attributeValue}`;
+  // Handle WXScript nodes
+  if (node.type === "WXScript") {
+    let result = "";
+    
+    // Print start tag manually
+    if (node.startTag) {
+      result += `<${node.startTag.name}`;
+      if (node.startTag.attributes && node.startTag.attributes.length > 0) {
+        for (const attr of node.startTag.attributes) {
+          const normalized = attr.value === null
+            ? attr.key
+            : `${attr.key}=${normalizeAttrValueForWxmlQuotes(attr.value, opts)}`;
+          result += ` ${normalized}`;
+        }
+      }
+      result += ">";
+    }
+    
+    // Print content with proper JavaScript formatting
+    if (node.value) {
+      result += "\n";
+      const jsCode = node.value.trim();
+      const indentSize = typeof opts.wxsTabWidth === 'number' ? opts.wxsTabWidth : (opts.tabWidth || 2);
+
+      let formatted = formatWxsByPrettier(jsCode, opts);
+      if (formatted == null) {
+        formatted = formatWxsByBabelCompat(jsCode, opts);
+      }
+      if (typeof formatted === 'string') {
+        // Enforce preferred string quote style for simple literals
+        const useSingle = opts.wxsSingleQuote !== false;
+        formatted = enforceWxsStringQuotes(formatted, useSingle);
+        
+        const content = (formatted.endsWith("\n") ? formatted : formatted + "\n");
+        result += indentLines(content, indentSize);
+      } else {
+        throw new Error("Failed to parse/format <wxs> JavaScript");
+      }
+    }
+    
+    // Print end tag manually
+    if (node.endTag) {
+      result += `</${node.endTag.name}>`;
+    }
+    
+    return result;
+  }
+  
+  return "";
 }
 
 function printCharData(path, opts, print) {
   const node = path.getValue();
   const { value } = node;
-  
-  if (!value) {
-    return "";
-  }
-  
-  // 如果文本内容仅包含空白字符，完全忽略
-  if (value.trim() === "") {
-    return "";
-  }
-  
-  // 对于有实际内容的文本，去除两端空白
+  if (!value) return "";
+  if (value.trim() === "") return "";
   return value.trim();
-}
-
-function addContentFragments(fragments, items, path, print, key) {
-  if (!items) return;
-  
-  items.forEach((item, index) => {
-    const printed = path.call(print, key, index);
-    if (printed && printed !== "") {
-      fragments.push({
-        offset: item.location ? item.location.startOffset : 0,
-        printed
-      });
-    }
-  });
-}
-
-function printContentFragments(path, print) {
-  const node = path.getValue();
-  const { CData, Comment, chardata, element } = node;
-  
-  const fragments = [];
-  
-  // Add all content types using the helper function
-  addContentFragments(fragments, Comment, path, print, "Comment");
-  addContentFragments(fragments, chardata, path, print, "chardata");
-  addContentFragments(fragments, element, path, print, "element");
-  
-  // CData has different structure, handle separately
-  if (CData) {
-    CData.forEach((cdata, index) => {
-      fragments.push({
-        offset: cdata.startOffset || 0,
-        printed: cdata
-      });
-    });
-  }
-  
-  return fragments;
-}
-
-function collectContentNodes(path) {
-  const contentNodes = [];
-  const { element, chardata, Comment } = path.getValue();
-  
-  if (element) {
-    element.forEach((el, index) => {
-      if (el.location) {
-        contentNodes.push({
-          type: 'element',
-          index,
-          start: el.location.startOffset,
-          end: el.location.endOffset,
-          node: el
-        });
-      }
-    });
-  }
-  
-  if (chardata) {
-    chardata.forEach((cd, index) => {
-      if (cd.location) {
-        contentNodes.push({
-          type: 'chardata',
-          index,
-          start: cd.location.startOffset,
-          end: cd.location.endOffset,
-          node: cd
-        });
-      }
-    });
-  }
-  
-  if (Comment) {
-    Comment.forEach((comment, index) => {
-      if (comment.location) {
-        contentNodes.push({
-          type: 'comment',
-          index,
-          start: comment.location.startOffset,
-          end: comment.location.endOffset,
-          node: comment
-        });
-      }
-    });
-  }
-  
-  return contentNodes.sort((a, b) => a.start - b.start);
-}
-
-function processContentNode(contentNode, path, opts, print, ignoreRanges) {
-  const isInIgnoreRange = ignoreRanges.some(range => 
-    contentNode.start >= range.start && contentNode.end <= range.end
-  );
-  
-  if (isInIgnoreRange) {
-    const originalContent = opts.originalText.slice(contentNode.start, contentNode.end + 1);
-    return {
-      offset: contentNode.start,
-      printed: doc.utils.replaceEndOfLine(originalContent)
-    };
-  }
-  
-  let printed;
-  if (contentNode.type === 'element') {
-    printed = path.call(print, "element", contentNode.index);
-  } else if (contentNode.type === 'chardata') {
-    printed = path.call(print, "chardata", contentNode.index);
-  } else if (contentNode.type === 'comment') {
-    printed = path.call(print, "Comment", contentNode.index);
-  }
-  
-  if (printed && printed !== "") {
-    return {
-      offset: contentNode.start,
-      printed
-    };
-  }
-  
-  return null;
-}
-
-function processIgnoredContent(path, opts, print) {
-  const { Comment } = path.getValue();
-  const ignoreRanges = buildIgnoreRanges(path.getValue(), Comment);
-  const contentNodes = collectContentNodes(path);
-  
-  const result = [];
-  contentNodes.forEach(contentNode => {
-    const processed = processContentNode(contentNode, path, opts, print, ignoreRanges);
-    if (processed) {
-      result.push(processed);
-    }
-  });
-  
-  return result;
-}
-
-function shouldKeepInline(path) {
-  const { chardata, element } = path.getValue();
-  const elementCount = element ? element.length : 0;
-  const hasOnlyTemplateContent = chardata && chardata.every(cd => {
-    const text = cd.TEXT || cd.SEA_WS || "";
-    return !text.trim() || TEMPLATE_EXPR_REGEX.test(text);
-  });
-  
-  return hasOnlyTemplateContent && elementCount === 0;
-}
-
-function printContent(path, opts, print) {
-  let fragments = printContentFragments(path, print);
-  const { Comment } = path.getValue();
-
-  if (hasIgnoreRanges(Comment)) {
-    fragments = processIgnoredContent(path, opts, print);
-  }
-  
-  fragments.sort((left, right) => left.offset - right.offset);
-  
-  const validFragments = fragments.map(({ printed }) => printed).filter(fragment => 
-    fragment && fragment !== ""
-  );
-  
-  if (validFragments.length === 0) {
-    return "";
-  }
-  
-  if (validFragments.length > 1) {
-    return validFragments;
-  }
-  
-  if (shouldKeepInline(path)) {
-    return validFragments;
-  }
-  
-  return validFragments;
 }
 
 function printElement(path, opts, print) {
   const node = path.getValue();
   const parts = [];
-  
-  // Print start tag
   if (node.startTag) {
     parts.push(path.call(print, "startTag"));
   }
-  
-  // Handle children
   if (node.children && node.children.length > 0) {
     const childrenParts = [];
-    
     for (let i = 0; i < node.children.length; i++) {
       const printed = path.call(print, "children", i);
       if (printed && printed !== "") {
         childrenParts.push(printed);
       }
     }
-    
     if (childrenParts.length > 0) {
-      // Check if content should be inlined
-      const hasOnlySimpleText = node.children.length === 1 && 
-        node.children[0].type === "WXText" && 
-        node.children[0].value && 
-        node.children[0].value.trim().length < 50 && 
+      const hasOnlySimpleText = node.children.length === 1 &&
+        node.children[0].type === "WXText" &&
+        node.children[0].value &&
+        node.children[0].value.trim().length < 50 &&
         !node.children[0].value.includes("\n");
-      
       if (hasOnlySimpleText) {
-        // For inline content
         parts.push(...childrenParts);
       } else {
-        // For block content - add proper line breaks and indentation
-        if (childrenParts.length > 0) {
-          const childrenWithBreaks = [];
-          for (let i = 0; i < childrenParts.length; i++) {
-            if (i > 0) {
-              childrenWithBreaks.push(hardline);
-            }
-            childrenWithBreaks.push(childrenParts[i]);
-          }
-          parts.push(indent([hardline, ...childrenWithBreaks]), hardline);
+        const childrenWithBreaks = [];
+        for (let i = 0; i < childrenParts.length; i++) {
+          if (i > 0) childrenWithBreaks.push(hardline);
+          childrenWithBreaks.push(childrenParts[i]);
         }
+        parts.push(indent([hardline, ...childrenWithBreaks]), hardline);
       }
     }
   }
-  
-  // Print end tag
   if (node.endTag) {
     parts.push(path.call(print, "endTag"));
   }
-  
   return group(parts);
 }
 
 function printDocument(path, opts, print) {
   const node = path.getValue();
   const { body } = node;
-  
-  if (!body || body.length === 0) {
-    return "";
-  }
-  
+  if (!body || body.length === 0) return "";
   const parts = [];
   let lastWasElement = false;
-  
   body.forEach((child, index) => {
     const printed = path.call(print, "body", index);
-    const isElement = child.type === 'WXElement'; // 正确检查是否是元素节点
-    
+    const isElement = child.type === 'WXElement';
     if (printed && printed !== "") {
-      // 只在两个元素节点之间添加换行
       if (parts.length > 0 && isElement && lastWasElement) {
         parts.push(hardline);
       }
       parts.push(printed);
     }
-    
-    // 更新 lastWasElement，只有当节点有实际输出时才更新
     if (printed && printed !== "") {
       lastWasElement = isElement;
     }
   });
-  
   if (parts.length > 0) {
     parts.push(hardline);
     return join("", parts);
   }
-  
   return "";
 }
 
@@ -370,8 +335,7 @@ function printComment(path, opts, print) {
 }
 
 const printer = {
-    preprocess(ast, options) {
-    // Build ignore ranges from comment tokens
+  preprocess(ast, options) {
     if (ast.commentTokens && ast.commentTokens.length > 0) {
       ast.ignoreRanges = buildIgnoreRanges(ast, ast.commentTokens);
     }
@@ -379,28 +343,21 @@ const printer = {
   },
   print(path, opts, print) {
     const node = path.getValue();
-    const ast = path.stack[0]; // Get root AST
-    
-    // Check if current node is in ignore range
-    if (ast.ignoreRanges && node.location) {
+    const ast = path.stack && path.stack[0];
+    if (ast && ast.ignoreRanges && node.location) {
       const nodeStart = node.location.startOffset;
       const nodeEnd = node.location.endOffset;
-      
       for (const range of ast.ignoreRanges) {
         if (nodeStart >= range.start && nodeEnd <= range.end) {
-          // Return original text for ignored nodes
           return opts.originalText.slice(nodeStart, nodeEnd);
         }
       }
     }
-    
     switch (node.type) {
       case "WXAttribute":
         return printAttribute(path, opts, print);
       case "WXCharData":
         return printCharData(path, opts, print);
-      case "WXContent":
-        return printContent(path, opts, print);
       case "Program":
         return printDocument(path, opts, print);
       case "WXElement":
@@ -416,162 +373,9 @@ const printer = {
       case "WXText":
         return printCharData(path, opts, print);
       default:
-        // For simple tokens, just return their value
         return node.image || "";
     }
   }
 };
-
-function printStartTag(path, opts, print) {
-  const node = path.getValue();
-  const parts = [`<${node.name}`];
-  
-  if (node.attributes && node.attributes.length > 0) {
-    const attributeDocs = [];
-    for (let i = 0; i < node.attributes.length; i++) {
-      attributeDocs.push(path.call(print, "attributes", i));
-    }
-    
-    // Calculate approximate length to decide if we need to break
-    const printWidth = opts.wxmlPrintWidth || opts.printWidth || 80;
-    const tagName = node.name;
-    const approximateLength = tagName.length + 2; // < and >
-    
-    // Estimate attribute lengths (rough approximation)
-    let attributesLength = 0;
-    if (node.attributes) {
-      attributesLength = node.attributes.reduce((sum, attr) => {
-        const keyLength = attr.key ? attr.key.length : 0;
-        const valueLength = attr.value ? attr.value.length + 3 : 0; // +3 for =""
-        return sum + keyLength + valueLength + 1; // +1 for space
-      }, 0);
-    }
-    
-    if (approximateLength + attributesLength > printWidth) {
-         // Break attributes to multiple lines
-         const indentedAttributes = indent([
-           softline,
-           join(hardline, attributeDocs)
-         ]);
-         parts.push(indentedAttributes, hardline);
-       } else {
-         // Keep on same line
-         parts.push(" ", join(" ", attributeDocs));
-       }
-  }
-  
-  if (node.selfClosing) {
-    parts.push(" />");
-  } else {
-    parts.push(">");
-  }
-  
-  return parts;
-}
-
-function printEndTag(path, opts, print) {
-  const node = path.getValue();
-  return `</${node.name}>`;
-}
-
-function formatWxsByBabel(jsCode, opts) {
-  const singleQuote = opts.wxsSingleQuote !== false;
-  const tabWidth = typeof opts.wxsTabWidth === 'number' ? opts.wxsTabWidth : (opts.tabWidth || 2);
-  try {
-    const ast = parse(jsCode, {
-      sourceType: "script",
-      allowReturnOutsideFunction: true,
-      errorRecovery: true
-    });
-    const { code } = generate(ast, {
-      comments: true,
-      compact: false,
-      retainLines: false,
-      jsescOption: { quotes: singleQuote ? 'single' : 'double' },
-      semicolons: true,
-      // Indentation is 2 spaces by default; babel-generator doesn't expose tabWidth directly
-    }, jsCode);
-    return code;
-  } catch (e) {
-    return null;
-  }
-}
-
-function indentLines(text, indentSize) {
-  const pad = " ".repeat(indentSize);
-  return text
-    .split("\n")
-    .map((l) => (l.trim() ? pad + l : l))
-    .join("\n");
-}
-
-function printMisc(path, opts, print) {
-  const node = path.getValue();
-  
-  // Handle WXScript nodes
-  if (node.type === "WXScript") {
-    let result = "";
-    
-    // Print start tag manually
-    if (node.startTag) {
-      result += `<${node.startTag.name}`;
-      if (node.startTag.attributes && node.startTag.attributes.length > 0) {
-        for (const attr of node.startTag.attributes) {
-          result += ` ${attr.key}="${attr.value}"`;
-        }
-      }
-      result += ">";
-    }
-    
-    // Print content with proper JavaScript formatting
-    if (node.value) {
-      result += "\n";
-      let jsCode = node.value.trim();
-      const indentSize = typeof opts.wxsTabWidth === 'number' ? opts.wxsTabWidth : (opts.tabWidth || 2);
-
-      const useParser = opts.wxsUsePrettierForJs === true; // ONLY when explicitly enabled
-      let formatted = null;
-      if (useParser) {
-        formatted = formatWxsByBabel(jsCode, opts);
-      }
-
-      if (typeof formatted === 'string') {
-        // Normalize to a single trailing newline inside <wxs>
-        const content = (formatted.endsWith("\n") ? formatted : formatted + "\n");
-        result += indentLines(content, indentSize);
-      } else if (useParser) {
-        // If parser is explicitly enabled and fails, do not fallback — throw to surface the error
-        throw new Error("Failed to parse/format <wxs> JavaScript with wxsUsePrettierForJs=true");
-      } else {
-        // Fallback: conservative rules without managing semicolons
-        // Add space before function parentheses: function( -> function (
-        jsCode = jsCode.replace(/function\s*\(/g, 'function (');
-
-        // Do not add or remove semicolons here; preserve original content
-
-        // Handle quotes based on options (best-effort)
-        if (opts.wxsSingleQuote !== false) {
-          jsCode = jsCode.replace(/\"([^\"]*)\"/g, "'$1'");
-        }
-        
-        const lines = jsCode.split('\n');
-        const indentedLines = lines.map(line => 
-          line.trim() ? `${' '.repeat(indentSize)}${line}` : line
-        );
-        result += indentedLines.join('\n');
-        result += "\n";
-      }
-    }
-    
-    // Print end tag manually
-    if (node.endTag) {
-      result += `</${node.endTag.name}>`;
-    }
-    
-    return result;
-  }
-  
-  return "";
-}
 
 export default printer;

@@ -30,9 +30,6 @@ function protectTemplateExpressions(text, protectedItems) {
   });
 }
 
-// Convert boolean attributes to standard XML format
-// processBooleanAttributes function removed - wxml-parser handles boolean attributes natively
-
 // Preprocess text for XML parsing
 function preprocessText(text) {
   const protectedItems = [];
@@ -119,10 +116,6 @@ const parser = {
     
     // Restore protected content
     ast = restoreProtectedContent(ast, protectedItems);
-    
-    // Mark if this is a multi-root document for printer
-    const elementChildren = ast.body ? ast.body.filter(child => child.type === 'WXElement') : [];
-    ast.isMultiRoot = elementChildren.length > 1;
     
     // Add comment tokens to AST for ignore functionality
     ast.commentTokens = ast.comments || [];
