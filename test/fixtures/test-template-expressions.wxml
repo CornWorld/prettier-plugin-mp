@@ -1,4 +1,4 @@
-<view class="{{ array[index] && array[index].className }}" data-id="{{ item && item.id }}">
-  <text>{{ array[index] && array[index].prop || 'default' }}</text>
-  <text wx:if="{{ user && user.profile && user.profile.isActive }}">{{ user.profile.name }}</text>
+<view class="{{ array[index]&&array[index].className }}" data-id="{{ item && item.id }}">
+  <text>{{ array[index] &&               array[index].prop || 'default' }}</text>
+  <text wx:if="{{ user&&      user.profile && user.profile.isActive }}">{{ user.profile.name }}</text>
 </view>

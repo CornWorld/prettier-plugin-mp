@@ -30,6 +30,19 @@ function buildIgnoreRanges(ast, comments) {
   return ranges;
 }
 
+function parseJsonOption(val) {
+  if (!val) return undefined;
+  if (typeof val === 'object') return val;
+  if (typeof val === 'string') {
+    try {
+      return JSON.parse(val);
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
 function printAttribute(path, opts, print) {
   const node = path.getValue();
   const { key, value, rawValue } = node;
@@ -91,15 +104,39 @@ function printEndTag(path, opts, print) {
   return `</${node.name}>`;
 }
 
+// Merge default Babel parser options with user-provided ones from Prettier rc
+function getBabelParserOptions(opts) {
+  const userRaw = (opts && opts.wxsBabelParserOptions) ? opts.wxsBabelParserOptions : undefined;
+  const user = parseJsonOption(userRaw) || {};
+  return {
+    sourceType: 'script',
+    allowReturnOutsideFunction: true,
+    allowAwaitOutsideFunction: true,
+    allowSuperOutsideMethod: true,
+    // allow users to specify additional parser plugins, etc.
+    ...user
+  };
+}
+
+// Merge default Babel generator options with user-provided ones from Prettier rc
+function getBabelGeneratorOptions(opts, useSingleQuote) {
+  const userRaw = (opts && opts.wxsBabelGeneratorOptions) ? opts.wxsBabelGeneratorOptions : undefined;
+  const user = parseJsonOption(userRaw) || {};
+  return {
+    comments: true,
+    compact: false,
+    retainLines: false,
+    quotes: useSingleQuote ? 'single' : 'double',
+    jsescOption: { quotes: useSingleQuote ? 'single' : 'double' },
+    semicolons: opts.wxsSemi !== false,
+    ...user
+  };
+}
+
 // Quick syntax check via Babel to avoid Prettier throwing parser errors
-function canParseWithBabel(jsCode) {
+function canParseWithBabel(jsCode, opts) {
   try {
-    parse(jsCode, {
-      sourceType: 'script',
-      allowReturnOutsideFunction: true,
-      allowAwaitOutsideFunction: true,
-      allowSuperOutsideMethod: true
-    });
+    parse(jsCode, getBabelParserOptions(opts));
     return true;
   } catch {
     return false;
@@ -114,7 +151,7 @@ function formatWxsByPrettier(jsCode, opts) {
   const printWidth = typeof opts.wxmlPrintWidth === 'number' ? opts.wxmlPrintWidth : (opts.printWidth || 80);
   try {
     // Avoid invoking Prettier when code is syntactically invalid to prevent global errors
-    if (!canParseWithBabel(jsCode)) return null;
+    if (!canParseWithBabel(jsCode, opts)) return null;
     const formatted = prettier.format(jsCode, {
       parser: 'babel',
       semi,
@@ -135,23 +172,11 @@ function formatWxsByPrettier(jsCode, opts) {
 // Fallback: Use Babel generator to produce stable output close to Prettier
 function formatWxsByBabelCompat(jsCode, opts) {
   try {
-    const ast = parse(jsCode, {
-      sourceType: 'script',
-      allowReturnOutsideFunction: true,
-      allowAwaitOutsideFunction: true,
-      allowSuperOutsideMethod: true
-    });
+    const ast = parse(jsCode, getBabelParserOptions(opts));
     const useSingle = opts.wxsSingleQuote !== false; // default true
     const { code } = generate(
       ast,
-      {
-        comments: true,
-        compact: false,
-        retainLines: false,
-        quotes: useSingle ? 'single' : 'double',
-        jsescOption: { quotes: useSingle ? 'single' : 'double' },
-        semicolons: opts.wxsSemi !== false
-      },
+      getBabelGeneratorOptions(opts, useSingle),
       jsCode
     );
     // Minimal stylistic normalization to match Prettier expectations
@@ -170,24 +195,45 @@ function indentLines(text, indentSize) {
     .join("\n");
 }
 
+function formatInlineJsExpression(expr, opts) {
+  if (typeof expr !== 'string') return expr;
+  // 1) Collapse any newlines (and surrounding spaces) into a single space
+  let s = expr.replace(/[ \t]*[\r\n]+[ \t]*/g, ' ');
+  // 2) Normalize spaces around logical operators without touching others
+  s = s.replace(/\s*&&\s*/g, ' && ').replace(/\s*\|\|\s*/g, ' || ');
+  return s.trim();
+}
+
+function formatWxmlInterpolations(text, opts) {
+  if (typeof text !== 'string' || text.indexOf('{{') === -1) return text;
+  return text.replace(/{{(\s*)([\s\S]*?)(\s*)}}/g, (m, lws, expr, rws) => {
+    const formatted = formatInlineJsExpression(expr, opts);
+    return `{{${lws}${formatted}${rws}}}`;
+  });
+}
+
 function normalizeAttrValueForWxmlQuotes(value, opts) {
   if (value == null) return null;
   let attributeValue = String(value);
-  if (!attributeValue.startsWith('"') && !attributeValue.startsWith("'")) {
-    // add quotes
-    attributeValue = opts.wxmlSingleQuote ? `'${attributeValue}'` : `"${attributeValue}"`;
-  } else {
-    if (opts.wxmlSingleQuote && attributeValue.startsWith('"') && attributeValue.endsWith('"')) {
-      const content = attributeValue.slice(1, -1);
-      if (!content.includes("'")) {
-        attributeValue = `'${content}'`;
-      }
-    } else if (!opts.wxmlSingleQuote && attributeValue.startsWith("'") && attributeValue.endsWith("'")) {
-      const content = attributeValue.slice(1, -1);
-      if (!content.includes('"')) {
-        attributeValue = `"${content}"`;
-      }
+  // Apply inline expression formatting inside quotes or raw
+  const isQuoted = (attributeValue.startsWith('"') && attributeValue.endsWith('"')) || (attributeValue.startsWith("'") && attributeValue.endsWith("'"));
+  if (isQuoted) {
+    const quote = attributeValue[0];
+    let content = attributeValue.slice(1, -1);
+    content = formatWxmlInterpolations(content, opts);
+    // Decide final quote style based on preference and content
+    const preferSingle = !!opts.wxmlSingleQuote;
+    if (preferSingle && !content.includes("'")) {
+      attributeValue = `'${content}'`;
+    } else if (!preferSingle && !content.includes('"')) {
+      attributeValue = `"${content}"`;
+    } else {
+      attributeValue = `${quote}${content}${quote}`;
     }
+  } else {
+    // Not quoted; first format interpolations then add quotes
+    const content = formatWxmlInterpolations(attributeValue, opts);
+    attributeValue = opts.wxmlSingleQuote ? `'${content}'` : `"${content}"`;
   }
   return attributeValue;
 }
@@ -196,10 +242,10 @@ function enforceWxsStringQuotes(code, useSingleQuote) {
   if (typeof code !== 'string') return code;
   if (useSingleQuote) {
     // Convert simple double-quoted strings (no quotes or backslashes inside) to single-quoted
-    return code.replace(/"([^"'\\\n\r]*)"/g, "'$1'");
+    return code.replace(/\"([^\"'\\\n\r]*)\"/g, "'$1'");
   } else {
     // Convert simple single-quoted strings (no quotes or backslashes inside) to double-quoted
-    return code.replace(/'([^"'\\\n\r]*)'/g, '"$1"');
+    return code.replace(/'([^\"'\\\n\r]*)'/g, '"$1"');
   }
 }
 
@@ -262,7 +308,9 @@ function printCharData(path, opts, print) {
   const { value } = node;
   if (!value) return "";
   if (value.trim() === "") return "";
-  return value.trim();
+  // Normalize inline template expressions
+  const normalized = formatWxmlInterpolations(value, opts);
+  return normalized.trim();
 }
 
 function printElement(path, opts, print) {
