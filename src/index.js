@@ -1,7 +1,6 @@
 import languages from "./languages.js";
 import parser from "./parser.js";
 import printer from "./printer.js";
-import embed from "./embed.js";
 
 const plugin = {
   languages,
@@ -9,7 +8,7 @@ const plugin = {
     wxml: parser
   },
   printers: {
-    wxml: { ...printer, embed }
+    wxml: { ...printer }
   },
   options: {
     wxmlTabWidth: {

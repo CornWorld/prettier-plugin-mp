@@ -1,5 +1,4 @@
 import * as doc from "prettier/doc";
-import embed from "./embed.js";
 
 const { group, hardline, indent, join, line, softline, ifBreak } = doc.builders;
 
@@ -368,8 +367,7 @@ function printComment(path, opts, print) {
 }
 
 const printer = {
-  embed,
-  preprocess(ast, options) {
+    preprocess(ast, options) {
     // Build ignore ranges from comment tokens
     if (ast.commentTokens && ast.commentTokens.length > 0) {
       ast.ignoreRanges = buildIgnoreRanges(ast, ast.commentTokens);
