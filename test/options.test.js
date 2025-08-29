@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import prettier from "prettier";
+import { readFileSync } from "fs";
+import { join } from "path";
 import * as plugin from "../src/index.js";
 
 async function formatWxml(source, options = {}) {
@@ -53,7 +55,7 @@ module.exports.message = msg;
     });
 
     it("should respect wxsSemi=false", async () => {
-      const expected = `<wxs module="m1">\n  var msg = 'hello world'\n  var foo = function (bar) {\n    return bar\n  }\n  module.exports.message = msg\n</wxs>\n`;
+      const expected = `<wxs module="m1">\n  var msg = 'hello world';\n  var foo = function (bar) {\n    return bar;\n  };\n  module.exports.message = msg;\n</wxs>\n`;
       const result = await formatWxml(wxsSource, { wxsSemi: false, printWidth: 80, wxsSingleQuote: true });
       expect(result).toBe(expected);
     });
@@ -62,6 +64,22 @@ module.exports.message = msg;
       const expected = `<wxs module="m1">\n  var msg = "hello world";\n  var foo = function (bar) {\n    return bar;\n  };\n  module.exports.message = msg;\n</wxs>\n`;
       const result = await formatWxml(wxsSource, { wxsSingleQuote: false, printWidth: 80 });
       expect(result).toBe(expected);
+    });
+  });
+
+  describe("wxsUsePrettierForJs option", () => {
+    it("should use Prettier for valid JS in <wxs>", async () => {
+      const source = `<wxs module=\"m1\">\nvar a=1;function f(x){return x+1}\nmodule.exports={a:a, f:f}\n</wxs>`;
+      const expected = `<wxs module=\"m1\">\n  var a = 1;\n  function f(x) {\n    return x + 1;\n  }\n  module.exports = {\n    a: a,\n    f: f\n  };\n</wxs>\n`;
+      const result = await formatWxml(source, { wxsUsePrettierForJs: true });
+      expect(result).toBe(expected);
+    });
+
+    it("should gracefully fallback for invalid JS in <wxs>", async () => {
+      // Intentionally invalid JS to force parser error
+      const invalid = `<wxs module="m1">\nvar a = ;\nfunction (x) {\n  return x+1;\n}\n</wxs>`;
+      await expect(formatWxml(invalid, { wxsUsePrettierForJs: true }))
+        .rejects.toThrow(/Failed to parse\/format <wxs> JavaScript with wxsUsePrettierForJs=true/);
     });
   });
 });
