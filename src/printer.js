@@ -61,6 +61,17 @@ function printAttribute(path, opts, print) {
   return `${key}=${attributeValue}`;
 }
 
+function isPlaceholderLikeValue(value) {
+  if (value == null) return false;
+  let s = String(value);
+  // strip surrounding quotes if present
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+    s = s.slice(1, -1);
+  }
+  // detect long runs of the same symbol characters (e.g., ======, ------, ______, ......, ~~~~~~)
+  return /([=\-_.~*])\1{5,}/.test(s);
+}
+
 function printStartTag(path, opts, print) {
   const node = path.getValue();
   const parts = ["<", node.name];
@@ -73,9 +84,20 @@ function printStartTag(path, opts, print) {
     // Calculate approximate length to decide line breaks
     const attributesLength = attributeDocs.reduce((sum, current) => sum + String(current).length + 1, 0);
     const printWidth = (typeof opts.wxmlPrintWidth === 'number') ? opts.wxmlPrintWidth : (opts.printWidth || 80);
-    const approximateLength = node.name.length + 1 + attributesLength; // "<" + name + space + attrs
 
-    const shouldBreak = approximateLength > printWidth || (node.selfClosing && node.attributes.length >= 4);
+    // Heuristic: if multiple attributes look like placeholders with long repeated symbols, prefer breaking
+    const placeholderCount = (node.attributes || []).reduce((acc, attr) => {
+      const raw = attr.rawValue != null ? attr.rawValue : attr.value;
+      return acc + (isPlaceholderLikeValue(raw) ? 1 : 0);
+    }, 0);
+    const placeholderPenalty = placeholderCount > 0 ? placeholderCount * 10 : 0;
+
+    const approximateLength = node.name.length + 1 + attributesLength + placeholderPenalty; // "<" + name + space + attrs
+
+    const shouldBreak =
+      approximateLength > printWidth ||
+      placeholderCount >= 2 ||
+      (node.selfClosing && node.attributes.length >= 4);
 
     if (shouldBreak) {
       // Break attributes to multiple lines
