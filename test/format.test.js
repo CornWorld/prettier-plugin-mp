@@ -122,4 +122,26 @@ describe("Format", () => {
     });
     expect(typeof result).toBe('string');
   });
+
+  it("should break attributes when multiple placeholder-like values are present", async () => {
+    const input = `<view wx:if="{====================================}" wx:for="{{------------}}" ></view>`;
+    const result = await formatWxml(input);
+    expect(result).toBe(
+      `<view\n  wx:if="===================================="\n  wx:for="{{------------}}"\n></view>\n`
+    );
+  });
+
+  it("should keep single placeholder attribute on the same line when under print width", async () => {
+    const input = `<view id="x" data-a="----------------" class="c"></view>`;
+    const result = await formatWxml(input, { printWidth: 200 });
+    expect(result).toBe(`<view id="x" data-a="----------------" class="c"></view>\n`);
+  });
+
+  it("should break many attributes for self-closing tags", async () => {
+    const input = `<image a='1' b='2' c='3' d='4'/>`;
+    const result = await formatWxml(input);
+    expect(result).toBe(
+      `<image\n  a="1"\n  b="2"\n  c="3"\n  d="4"\n />\n`
+    );
+  });
 });
