@@ -1,4 +1,7 @@
 import * as doc from "prettier/doc";
+import prettier from "prettier";
+import { parse } from "@babel/parser";
+import generate from "@babel/generator";
 
 const { group, hardline, indent, join, line, softline, ifBreak } = doc.builders;
 
@@ -18,7 +21,7 @@ function buildIgnoreRanges(ast, comments) {
   const ranges = [];
   
   // Use commentTokens from AST if available, otherwise fall back to comments parameter
-  const commentSource = ast.commentTokens || comments;
+  const commentSource = ast && ast.commentTokens ? ast.commentTokens : comments;
   commentSource.sort((left, right) => left.startOffset - right.startOffset);
 
   let start = null;
@@ -247,7 +250,7 @@ function printContent(path, opts, print) {
   if (hasIgnoreRanges(Comment)) {
     fragments = processIgnoredContent(path, opts, print);
   }
-
+  
   fragments.sort((left, right) => left.offset - right.offset);
   
   const validFragments = fragments.map(({ printed }) => printed).filter(fragment => 
@@ -471,6 +474,37 @@ function printEndTag(path, opts, print) {
   return `</${node.name}>`;
 }
 
+function formatWxsByBabel(jsCode, opts) {
+  const singleQuote = opts.wxsSingleQuote !== false;
+  const tabWidth = typeof opts.wxsTabWidth === 'number' ? opts.wxsTabWidth : (opts.tabWidth || 2);
+  try {
+    const ast = parse(jsCode, {
+      sourceType: "script",
+      allowReturnOutsideFunction: true,
+      errorRecovery: true
+    });
+    const { code } = generate(ast, {
+      comments: true,
+      compact: false,
+      retainLines: false,
+      jsescOption: { quotes: singleQuote ? 'single' : 'double' },
+      semicolons: true,
+      // Indentation is 2 spaces by default; babel-generator doesn't expose tabWidth directly
+    }, jsCode);
+    return code;
+  } catch (e) {
+    return null;
+  }
+}
+
+function indentLines(text, indentSize) {
+  const pad = " ".repeat(indentSize);
+  return text
+    .split("\n")
+    .map((l) => (l.trim() ? pad + l : l))
+    .join("\n");
+}
+
 function printMisc(path, opts, print) {
   const node = path.getValue();
   
@@ -492,38 +526,41 @@ function printMisc(path, opts, print) {
     // Print content with proper JavaScript formatting
     if (node.value) {
       result += "\n";
-      // Apply basic JavaScript formatting rules
       let jsCode = node.value.trim();
-      
-      // Add space before function parentheses: function( -> function (
-      jsCode = jsCode.replace(/function\s*\(/g, 'function (');
-      
-      // Handle semicolons based on options
-       if (opts.wxsSemi === false) {
-         // Remove semicolons at end of lines
-         jsCode = jsCode.replace(/;\s*$/gm, '');
-       } else {
-         // Ensure semicolons at end of statements (but not before { or after })
-         jsCode = jsCode.replace(/([^;\s{}])\s*$/gm, (match, p1) => {
-           // Don't add semicolon if line ends with { or }
-           if (p1 === '{' || p1 === '}') return match;
-           return p1 + ';';
-         });
-       }
-      
-      // Handle quotes based on options
-      if (opts.wxsSingleQuote !== false) {
-        // Convert double quotes to single quotes for strings
-        jsCode = jsCode.replace(/"([^"]*)"/g, "'$1'");
+      const indentSize = typeof opts.wxsTabWidth === 'number' ? opts.wxsTabWidth : (opts.tabWidth || 2);
+
+      const useParser = opts.wxsUsePrettierForJs === true; // ONLY when explicitly enabled
+      let formatted = null;
+      if (useParser) {
+        formatted = formatWxsByBabel(jsCode, opts);
       }
-      
-      // Split into lines and add indentation
-      const lines = jsCode.split('\n');
-      const indentedLines = lines.map(line => 
-        line.trim() ? `  ${line}` : line
-      );
-      result += indentedLines.join('\n');
-      result += "\n";
+
+      if (typeof formatted === 'string') {
+        // Normalize to a single trailing newline inside <wxs>
+        const content = (formatted.endsWith("\n") ? formatted : formatted + "\n");
+        result += indentLines(content, indentSize);
+      } else if (useParser) {
+        // If parser is explicitly enabled and fails, do not fallback — throw to surface the error
+        throw new Error("Failed to parse/format <wxs> JavaScript with wxsUsePrettierForJs=true");
+      } else {
+        // Fallback: conservative rules without managing semicolons
+        // Add space before function parentheses: function( -> function (
+        jsCode = jsCode.replace(/function\s*\(/g, 'function (');
+
+        // Do not add or remove semicolons here; preserve original content
+
+        // Handle quotes based on options (best-effort)
+        if (opts.wxsSingleQuote !== false) {
+          jsCode = jsCode.replace(/\"([^\"]*)\"/g, "'$1'");
+        }
+        
+        const lines = jsCode.split('\n');
+        const indentedLines = lines.map(line => 
+          line.trim() ? `${' '.repeat(indentSize)}${line}` : line
+        );
+        result += indentedLines.join('\n');
+        result += "\n";
+      }
     }
     
     // Print end tag manually

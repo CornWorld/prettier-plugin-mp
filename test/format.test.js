@@ -95,6 +95,12 @@ describe("Format", () => {
     expect(result).toMatchSnapshot();
   });
 
+  it("should handle long ES5 WXS code", async () => {
+    const content = readFileSync(join(__dirname, "fixtures/test-wxs-long-es5.wxml"), "utf8");
+    const result = await formatWxml(content);
+    expect(result).toMatchSnapshot();
+  });
+
   it("should handle complex real page", async () => {
     const content = readFileSync(join(__dirname, "fixtures/test-complex-real.wxml"), "utf8");
     // this come from https://raw.githubusercontent.com/EastWorld/wechat-app-mall/refs/heads/master/packageCps/pages/goods-details/cps-jd.wxml
