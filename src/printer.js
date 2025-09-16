@@ -1,5 +1,4 @@
 import * as doc from "prettier/doc";
-import prettier from "prettier";
 import { parse } from "@babel/parser";
 import generate from "@babel/generator";
 
@@ -135,6 +134,18 @@ function getBabelParserOptions(opts) {
     allowReturnOutsideFunction: true,
     allowAwaitOutsideFunction: true,
     allowSuperOutsideMethod: true,
+    plugins: [
+      // 常见现代语法，尽量容忍更多写法
+      'jsx',
+      'classProperties',
+      'optionalChaining',
+      'nullishCoalescingOperator',
+      'dynamicImport',
+      'numericSeparator',
+      'topLevelAwait',
+      'logicalAssignment',
+      'objectRestSpread'
+    ],
     // allow users to specify additional parser plugins, etc.
     ...user
   };
@@ -167,28 +178,8 @@ function canParseWithBabel(jsCode, opts) {
 
 // Use Prettier to format JS inside <wxs>
 function formatWxsByPrettier(jsCode, opts) {
-  const semi = opts.wxsSemi !== false; // default true
-  const singleQuote = opts.wxsSingleQuote !== false; // default true
-  const tabWidth = typeof opts.wxsTabWidth === 'number' ? opts.wxsTabWidth : (opts.tabWidth || 2);
-  const printWidth = typeof opts.wxmlPrintWidth === 'number' ? opts.wxmlPrintWidth : (opts.printWidth || 80);
-  try {
-    // Avoid invoking Prettier when code is syntactically invalid to prevent global errors
-    if (!canParseWithBabel(jsCode, opts)) return null;
-    const formatted = prettier.format(jsCode, {
-      parser: 'babel',
-      semi,
-      singleQuote,
-      tabWidth,
-      printWidth,
-      // isolate to avoid recursive plugin involvement
-      plugins: [],
-      // filename hint helps parser inference and pragma behaviors
-      filepath: 'inline.wxs.js'
-    });
-    return formatted.trimEnd();
-  } catch (e) {
-    return null;
-  }
+  // 不再尝试内嵌调用 Prettier（v3 的 format 为 Promise，打印器无法等待），统一走 Babel 生成路径
+  return null;
 }
 
 // Fallback: Use Babel generator to produce stable output close to Prettier
@@ -196,15 +187,19 @@ function formatWxsByBabelCompat(jsCode, opts) {
   try {
     const ast = parse(jsCode, getBabelParserOptions(opts));
     const useSingle = opts.wxsSingleQuote !== false; // default true
-    const { code } = generate(
+    const gen = (generate && (generate.default || generate));
+    if (typeof gen !== 'function') {
+      throw new TypeError('generate is not a function');
+    }
+    const { code } = gen(
       ast,
       getBabelGeneratorOptions(opts, useSingle),
       jsCode
     );
-    // Minimal stylistic normalization to match Prettier expectations
     let pretty = code.replace(/\bfunction\(/g, 'function (');
     return pretty.trimEnd();
   } catch (e) {
+    try { console.error('[wxs][babel] parse/generate error:', e && e.message); } catch {}
     return null;
   }
 }
@@ -298,20 +293,23 @@ function printMisc(path, opts, print) {
       const jsCode = node.value.trim();
       const indentSize = typeof opts.wxsTabWidth === 'number' ? opts.wxsTabWidth : (opts.tabWidth || 2);
 
-      let formatted = formatWxsByPrettier(jsCode, opts);
+      let formatted = null; // 不再使用 Prettier 路径
       if (formatted == null) {
         formatted = formatWxsByBabelCompat(jsCode, opts);
       }
       if (typeof formatted === 'string') {
-        // Enforce preferred string quote style for simple literals
+        // Enforce preferred string quote style for simple literals only when formatted
         const useSingle = opts.wxsSingleQuote !== false;
         formatted = enforceWxsStringQuotes(formatted, useSingle);
-        
-        const content = (formatted.endsWith("\n") ? formatted : formatted + "\n");
-        result += indentLines(content, indentSize);
       } else {
+        try {
+          const snippet = jsCode.split('\n').slice(0, 5).join('\n');
+          console.error('[wxs] Unable to format. First lines:', snippet);
+        } catch {}
         throw new Error("Failed to parse/format <wxs> JavaScript");
       }
+      const content = (formatted.endsWith("\n") ? formatted : formatted + "\n");
+      result += indentLines(content, indentSize);
     }
     
     // Print end tag manually
