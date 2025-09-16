@@ -382,18 +382,18 @@ function printDocument(path, opts, print) {
   const { body } = node;
   if (!body || body.length === 0) return "";
   const parts = [];
-  let lastWasElement = false;
+  let lastWasBlock = false; // blocks: element/script/comment
   body.forEach((child, index) => {
     const printed = path.call(print, "body", index);
-    const isElement = child.type === 'WXElement' || child.type === 'WXScript';
+    const isBlock = child.type === 'WXElement' || child.type === 'WXScript' || child.type === 'WXComment';
     if (printed && printed !== "") {
-      if (parts.length > 0 && isElement && lastWasElement) {
+      if (parts.length > 0 && (isBlock || lastWasBlock)) {
         parts.push(hardline);
       }
       parts.push(printed);
     }
     if (printed && printed !== "") {
-      lastWasElement = isElement;
+      lastWasBlock = isBlock;
     }
   });
   if (parts.length > 0) {

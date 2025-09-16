@@ -134,7 +134,9 @@ exports[`E2E: real-world WXML under wxml-dir > format apply.wxml 1`] = `
      />
   </view>
 </form>
-<fuwuxieyi k="invoice_apply" /><!-- 弹出编辑昵称和头像的框 --><login
+<fuwuxieyi k="invoice_apply" />
+<!-- 弹出编辑昵称和头像的框 -->
+<login
   show="{{ nickPopShow }}"
   avatarUrl="{{ popavatarUrl }}"
   name="{{ popnick }}"
@@ -143,7 +145,8 @@ exports[`E2E: real-world WXML under wxml-dir > format apply.wxml 1`] = `
 `;
 
 exports[`E2E: real-world WXML under wxml-dir > format audio-template.wxml 1`] = `
-"<!-- 语音通话模版占位样式 您应根据自己的业务需要进行调整 --><template name="audio-template">
+"<!-- 语音通话模版占位样式 您应根据自己的业务需要进行调整 -->
+<template name="audio-template">
   <view class="audio-place-holder">
     <view class="{{'TRTCCalling-call-audio-img' + streamList.length}}">
       <image src="./static/avatar1_100.png" class="img-place-holder">
@@ -1671,7 +1674,8 @@ exports[`E2E: real-world WXML under wxml-dir > format form.wxml 1`] = `
 `;
 
 exports[`E2E: real-world WXML under wxml-dir > format fxmember.wxml 1`] = `
-"<!--pages/packageA/pages/vip/fxmember.wxml--><view>
+"<!--pages/packageA/pages/vip/fxmember.wxml-->
+<view>
   <view wx:for="{{memberList.result}}" class="listItem">
     <view style="display:flex;align-items:center">
       <view>
@@ -1788,7 +1792,9 @@ exports[`E2E: real-world WXML under wxml-dir > format index.wxml 1`] = `
     mode="aspectFit"
     src="../../images/index-top-bg.png"
   ></image>
-</view><!-- 如果当前用户是分销商 --><view wx:if="{{apiUserInfoMap.base && apiUserInfoMap.base.isSeller}}">
+</view>
+<!-- 如果当前用户是分销商 -->
+<view wx:if="{{apiUserInfoMap.base && apiUserInfoMap.base.isSeller}}">
   <view class="tabTop" style="margin-top:-420rpx">
     <view class="header-box">
       <image
@@ -1978,7 +1984,9 @@ exports[`E2E: real-world WXML under wxml-dir > format index.wxml 1`] = `
       </view>
     </view>
   </view>
-</view><!-- 还不是分销商 --><view
+</view>
+<!-- 还不是分销商 -->
+<view
   wx:if="{{apiUserInfoMap.base && !apiUserInfoMap.base.isSeller}}"
   class="tabTop"
   style="margin-top:-450rpx"
