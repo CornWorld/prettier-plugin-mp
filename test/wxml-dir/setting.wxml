@@ -1,0 +1,10 @@
+<van-cell title="关于我们" is-link url="/pages/about/index" />
+<van-cell title="视频客服" is-link url="/packageStreamMedia/pages/videoCall/videoCall" />
+<van-cell title="意见反馈" is-link url="/pages/my/feedback" />
+<van-cell title="清除缓存" is-link bind:click="clearStorage" />
+<van-cell title="{{ enableDebug ? '关闭调试模式' : '打开调试模式' }}" is-link bind:click="setEnableDebug" />
+<van-cell title="权限与设置" is-link bind:click="openSetting" />
+<van-cell title="当前版本" value="{{version}}" />
+<view class="btn">
+  <van-button type="danger" block round bind:click="loginOut">退出登录</van-button>
+</view>

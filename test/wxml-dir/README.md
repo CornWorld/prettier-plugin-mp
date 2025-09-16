@@ -1,0 +1,2 @@
+All the code in this dir are a copy from [EastWorld/wechat-app-mall](https://github.com/EastWorld/wechat-app-mall/commit/3c01ca4ff00680da2f54da2f13aeebb26861d159) which is under Apache License 2.
+Thanks for all!
