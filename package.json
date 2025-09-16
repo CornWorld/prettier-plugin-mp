@@ -1,6 +1,6 @@
 {
   "name": "prettier-plugin-mp",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Prettier plugin for WeChat Mini Program WXML files",
   "main": "src/index.js",
   "repository": {

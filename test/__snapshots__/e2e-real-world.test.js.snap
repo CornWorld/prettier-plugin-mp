@@ -228,7 +228,9 @@ exports[`E2E: real-world WXML under wxml-dir > format audio-template.wxml 1`] = 
 `;
 
 exports[`E2E: real-world WXML under wxml-dir > format calendar.wxml 1`] = `
-"<wxs src="./index.wxs" module="computed"><wxs src="../wxs/utils.wxs" module="utils"><view class="van-calendar">
+"<wxs src="./index.wxs" module="computed" />
+<wxs src="../wxs/utils.wxs" module="utils" />
+<view class="van-calendar">
   <header
     title="{{ title }}"
     showTitle="{{ showTitle }}"
@@ -2102,7 +2104,8 @@ exports[`E2E: real-world WXML under wxml-dir > format info-menu.wxml 1`] = `
 `;
 
 exports[`E2E: real-world WXML under wxml-dir > format input.wxml 1`] = `
-"<wxs src="../wxs/utils.wxs" module="utils"><input
+"<wxs src="../wxs/utils.wxs" module="utils" />
+<input
   id="{{ name }}"
   class="{{ utils.bem('field__control', [inputAlign, { disabled, error }]) }} input-class"
   type="{{ type }}"
@@ -2373,7 +2376,8 @@ exports[`E2E: real-world WXML under wxml-dir > format node.wxml 1`] = `
   module.exports = function (n, i) {
     return e[n] || -1 !== (i || '').indexOf('inline');
   };
-</wxs><template name="el">
+</wxs>
+<template name="el">
   <block wx:if="{{n.name==='img'}}">
     <rich-text
       wx:if="{{n.t}}"
@@ -2534,7 +2538,9 @@ exports[`E2E: real-world WXML under wxml-dir > format node.wxml 1`] = `
 `;
 
 exports[`E2E: real-world WXML under wxml-dir > format options.wxml 1`] = `
-"<wxs src="../wxs/utils.wxs" module="utils"><wxs src="./options.wxs" module="computed"><view class="{{ utils.bem('share-sheet__options', { border: showBorder }) }}">
+"<wxs src="../wxs/utils.wxs" module="utils" />
+<wxs src="./options.wxs" module="computed" />
+<view class="{{ utils.bem('share-sheet__options', { border: showBorder }) }}">
   <view
     wx:for="{{ options }}"
     wx:key="index"
@@ -2746,7 +2752,9 @@ exports[`E2E: real-world WXML under wxml-dir > format pay.wxml 1`] = `
 `;
 
 exports[`E2E: real-world WXML under wxml-dir > format popup.wxml 1`] = `
-"<wxs src="../wxs/utils.wxs" module="utils"><wxs src="./index.wxs" module="computed"><view
+"<wxs src="../wxs/utils.wxs" module="utils" />
+<wxs src="./index.wxs" module="computed" />
+<view
   wx:if="{{ inited }}"
   class="custom-class {{ classes }} {{ utils.bem('popup', [position, { round, safe: safeAreaInsetBottom, safeTop: safeAreaInsetTop, safeTabBar: safeAreaTabBar }]) }}"
   style="{{ computed.popupStyle({ zIndex, currentDuration, display, customStyle }) }}"
@@ -3570,7 +3578,9 @@ exports[`E2E: real-world WXML under wxml-dir > format template-cart.wxml 1`] = `
 `;
 
 exports[`E2E: real-world WXML under wxml-dir > format textarea.wxml 1`] = `
-"<wxs src="../wxs/utils.wxs" module="utils"><wxs src="./index.wxs" module="computed"><textarea
+"<wxs src="../wxs/utils.wxs" module="utils" />
+<wxs src="./index.wxs" module="computed" />
+<textarea
   id="{{ name }}"
   class="{{ utils.bem('field__control', [inputAlign, type, { disabled, error }]) }} input-class"
   fixed="{{ fixed }}"

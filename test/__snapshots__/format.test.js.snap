@@ -684,7 +684,8 @@ exports[`Format > should handle long ES5 WXS code 1`] = `
     isEven: isEven,
     double: double
   };
-</wxs><view>
+</wxs>
+<view>
   <text></text>
   <text>
     {{ obj && obj.deep && obj.deep.z && obj.deep.z.k }}

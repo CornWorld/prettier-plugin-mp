@@ -275,6 +275,7 @@ function printMisc(path, opts, print) {
     
     // Print start tag manually
     if (node.startTag) {
+      const isSelfClosing = !!node.startTag.selfClosing;
       result += `<${node.startTag.name}`;
       if (node.startTag.attributes && node.startTag.attributes.length > 0) {
         for (const attr of node.startTag.attributes) {
@@ -284,7 +285,12 @@ function printMisc(path, opts, print) {
           result += ` ${normalized}`;
         }
       }
-      result += ">";
+      if (isSelfClosing) {
+        result += " />";
+        return result; // self-closing: no content, no end tag
+      } else {
+        result += ">";
+      }
     }
     
     // Print content with proper JavaScript formatting
@@ -379,7 +385,7 @@ function printDocument(path, opts, print) {
   let lastWasElement = false;
   body.forEach((child, index) => {
     const printed = path.call(print, "body", index);
-    const isElement = child.type === 'WXElement';
+    const isElement = child.type === 'WXElement' || child.type === 'WXScript';
     if (printed && printed !== "") {
       if (parts.length > 0 && isElement && lastWasElement) {
         parts.push(hardline);
