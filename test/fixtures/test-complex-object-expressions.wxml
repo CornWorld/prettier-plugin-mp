@@ -1,0 +1,33 @@
+<!-- 测试复杂对象表达式的格式化 -->
+<view class="product__label-content">{{fn.formatNum(0, {unit: '¥', range: [item.minSkuOriginalPrice, item.maxSkuOriginalPrice]})}}</view>
+
+<!-- 其他复杂表达式测试用例 -->
+<view>{{ utils.format(1234.5, { currency: 'USD', precision: 3 }) }}</view>
+<text>{{ helper.calculate(price, { tax: 0.1, discount: [10, 20], options: { round: true } }) }}</text>
+<view>{{ fn.process(data, { 
+  format: 'json', 
+  filters: ['active', 'visible'], 
+  meta: { 
+    version: '1.0',
+    config: { debug: false, cache: true }
+  }
+}) }}</view>
+
+<!-- 嵌套数组和对象 -->
+<text>{{ utils.transform([1, 2, 3], { map: x => x * 2, filter: { min: 0, max: 10 } }) }}</text>
+<view>{{ api.request('/users', { 
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: { name: 'test', tags: ['user', 'active'] }
+}) }}</view>
+
+<!-- 包含特殊字符的表达式 -->
+<view>{{ price.format({ symbol: '¥', locale: 'zh-CN' }) }}</view>
+<text>{{ currency.convert(100, { from: 'USD', to: '¥', rate: 6.8 }) }}</text>
+
+<!-- 复杂条件表达式 -->
+<view>{{ item && item.price && item.price.format({ 
+  currency: '¥', 
+  precision: 2,
+  options: { showSymbol: true, grouping: true }
+}) || 'N/A' }}</view>

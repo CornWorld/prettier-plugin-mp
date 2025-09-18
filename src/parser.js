@@ -18,16 +18,54 @@ function protectWxsContent(text, protectedItems) {
 // Protect template expressions from XML parser
 function protectTemplateExpressions(text, protectedItems) {
   let templateIndex = 0;
-  return text.replace(/\{\{([^}]+)\}\}/g, (match, content) => {
-    const placeholder = `__TEMPLATE_EXPR_${templateIndex}__`;
-    protectedItems.push({ 
-      placeholder, 
-      content: content, // Keep original spacing
-      type: 'TEMPLATE_EXPR'
-    });
-    templateIndex++;
-    return placeholder;
-  });
+  let result = '';
+  let i = 0;
+  
+  while (i < text.length) {
+    // Look for opening {{
+    if (i < text.length - 1 && text[i] === '{' && text[i + 1] === '{') {
+      let start = i;
+      i += 2; // Skip {{
+      
+      // Find the matching }}
+      let braceCount = 1;
+      let expressionStart = i;
+      
+      while (i < text.length && braceCount > 0) {
+        if (text[i] === '{') {
+          braceCount++;
+        } else if (text[i] === '}') {
+          braceCount--;
+          if (braceCount === 0 && i < text.length - 1 && text[i + 1] === '}') {
+            // Found matching }}
+            const content = text.slice(expressionStart, i);
+            const placeholder = `__TEMPLATE_EXPR_${templateIndex}__`;
+            protectedItems.push({ 
+              placeholder, 
+              content: content, // Keep original spacing
+              type: 'TEMPLATE_EXPR'
+            });
+            templateIndex++;
+            result += placeholder;
+            i += 2; // Skip }}
+            break;
+          }
+        }
+        i++;
+      }
+      
+      // If we didn't find a matching }}, treat as regular text
+      if (braceCount > 0) {
+        result += text.slice(start, expressionStart);
+        i = expressionStart;
+      }
+    } else {
+      result += text[i];
+      i++;
+    }
+  }
+  
+  return result;
 }
 
 // Preprocess text for XML parsing

@@ -36,6 +36,28 @@ describe("Options", () => {
     expect(result).toBe(expected);
   });
 
+  describe("WXML Formatting Options", () => {
+    it("should break children for tags listed in wxmlPreferBreakTags (e.g., button)", async () => {
+      const source = `<view>\n  <button type="primary" size="mini" bindtap="_save"> 保存 </button>\n</view>`;
+      const expected = `<view>\n  <button type="primary" size="mini" bindtap="_save">\n    保存\n  </button>\n</view>\n`;
+      const result = await formatWxml(source, { wxmlPreferBreakTags: "wxs,template,button" });
+      expect(result).toBe(expected);
+    });
+
+    it("should disable strict <text> rendering when wxmlStrictText=false (indent applies)", async () => {
+      const source = `<text>\n  A\n  B\n</text>`;
+      // With strict mode ON (default), children are not indented and whitespace is preserved:
+      const expectedStrict = `<text>\n  A\n  B\n</text>\n`;
+      const strict = await formatWxml(source, {});
+      expect(strict).toBe(expectedStrict);
+
+      // With strict mode OFF, container indentation applies but inner text newlines are not re-indented
+      const expectedNonStrict = `<text>\n  A\n  B\n</text>\n`;
+      const nonStrict = await formatWxml(source, { wxmlStrictText: false });
+      expect(nonStrict).toBe(expectedNonStrict);
+    });
+  });
+
   describe("WXS Formatting Options", () => {
     const wxsSource = `
 <wxs module="m1">

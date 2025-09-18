@@ -144,4 +144,68 @@ describe("Format", () => {
       `<image\n  a="1"\n  b="2"\n  c="3"\n  d="4"\n />\n`
     );
   });
+
+  it("should preserve template expressions with object literals", async () => {
+    const input = `<view>{{fn.formatNum(0, {unit: '¥'})}}</view>`;
+    const result = await formatWxml(input);
+    expect(result).toBe(`<view>{{fn.formatNum(0, {unit: '¥'})}}</view>\n`);
+  });
+
+  it("should preserve complex template expressions with nested objects", async () => {
+    const input = `<view class="product__label-content">{{fn.formatNum(0, {unit: '¥', range: [item.minSkuOriginalPrice, item.maxSkuOriginalPrice]})}}</view>`;
+    const result = await formatWxml(input);
+    expect(result).toBe(
+      `<view class="product__label-content">\n  {{fn.formatNum(0, {unit: '¥', range: [item.minSkuOriginalPrice, item.maxSkuOriginalPrice]})}}\n</view>\n`
+    );
+  });
+
+  it("should handle multiple template expressions with object literals", async () => {
+    const input = `<view>{{fn({key: 'value'})}} {{item}} {{obj.prop}} {{func(arg)}}</view>`;
+    const result = await formatWxml(input);
+    expect(result).toBe(`<view>\n  {{fn({key: 'value'})}} {{item}} {{obj.prop}} {{func(arg)}}\n</view>\n`);
+  });
+
+  // New tests for whitespace handling to prevent silent data cleanup
+  it("should preserve leading and trailing spaces in non-empty text nodes", async () => {
+    const input = `<view> a </view>`;
+    const result = await formatWxml(input);
+    expect(result).toBe(`<view> a </view>\n`);
+  });
+
+  it("should remove pure-whitespace text nodes", async () => {
+    const input = `<view>  </view>`;
+    const result = await formatWxml(input);
+    expect(result).toBe(`<view></view>\n`);
+  });
+
+  it("should preserve outer spaces and normalize expression inside interpolation", async () => {
+    const input = `<view>{{  a&&b  }}</view>`;
+    const result = await formatWxml(input);
+    // keep outer spaces inside braces, but normalize expression 'a && b'
+    expect(result).toBe(`<view>{{  a && b  }}</view>\n`);
+  });
+
+  it("should preserve spaces around a single interpolation inside element", async () => {
+    const input = `<view> {{x}} </view>`;
+    const result = await formatWxml(input);
+    expect(result).toBe(`<view> {{x}} </view>\n`);
+  });
+
+  it("should break to multiline when newline exists and drop whitespace-only children", async () => {
+    const input = `<view>\n  {{x}}\n</view>`;
+    const result = await formatWxml(input);
+    expect(result).toBe(`<view>\n  {{x}}\n</view>\n`);
+  });
+
+  it("should preserve spaces around interpolation with surrounding text", async () => {
+    const input = `<view> a{{x}}b </view>`;
+    const result = await formatWxml(input);
+    expect(result).toBe(`<view> a{{x}}b </view>\n`);
+  });
+
+  it("should inline short text-interpolation-text trio and preserve spaces", async () => {
+    const input = `<view>a {{x}} b</view>`;
+    const result = await formatWxml(input);
+    expect(result).toBe(`<view>a {{x}} b</view>\n`);
+  });
 });

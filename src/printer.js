@@ -7,6 +7,54 @@ const { group, hardline, indent, join, line, softline /*, ifBreak*/ } = doc.buil
 const ignoreStartComment = "<!-- prettier-ignore-start -->";
 const ignoreEndComment = "<!-- prettier-ignore-end -->";
 
+// Helper: determine if inner lines of a mustache form a simple identifier (single line)
+function isSimpleMustacheIdentifier(innerLines) {
+  if (!Array.isArray(innerLines) || innerLines.length !== 1) return false;
+  const s = innerLines[0];
+  return /^[A-Za-z_$][0-9A-Za-z_$]*$/.test(s);
+}
+
+// Helper: build doc for multi-line mustache printed text, or return null if not applicable
+function buildMultiLineMustacheDocFromPrinted(printedText) {
+  if (typeof printedText !== "string" || !printedText.includes("\n")) return null;
+  const rawLines = printedText.split("\n").map((s) => s.trim());
+  if (rawLines[0] !== "{{" || rawLines[rawLines.length - 1] !== "}}") return null;
+
+  const innerLines = rawLines.slice(1, rawLines.length - 1);
+  const simple = isSimpleMustacheIdentifier(innerLines);
+
+  const contentDoc = [];
+  for (let li = 1; li < rawLines.length - 1; li++) {
+    contentDoc.push(hardline, rawLines[li]);
+  }
+
+  if (simple) {
+    // Simple identifier like "title": content aligns with '{{', '}}' at parent indent
+    return [
+      indent([
+        hardline,
+        "{{",
+        ...contentDoc,
+      ]),
+      hardline,
+      "}}",
+      hardline,
+    ];
+  }
+
+  // Complex expression: indent inner content, align '}}' with '{{'
+  return [
+    indent([
+      hardline,
+      "{{",
+      indent(contentDoc),
+      hardline,
+      "}}",
+    ]),
+    hardline,
+  ];
+}
+
 function buildIgnoreRanges(ast, comments) {
   const ranges = [];
   
@@ -326,17 +374,21 @@ function printMisc(path, opts, print) {
     return result;
   }
   
-  return "";
+  throw new Error(`printMisc received unknown node type: ${node.type}. This is a bug in the printer.`);
 }
 
 function printCharData(path, opts, print) {
   const node = path.getValue();
   const { value } = node;
-  if (!value) return "";
-  if (value.trim() === "") return "";
+  if (value == null) return "";
+  if (value.trim() === "") {
+    // Return whitespace as-is; element-level logic decides whether to keep it
+    return value;
+  }
   // Normalize inline template expressions
   const normalized = formatWxmlInterpolations(value, opts);
-  return normalized.trim();
+  // Do not trim() here to avoid silently removing significant leading/trailing spaces in text nodes
+  return normalized;
 }
 
 function printElement(path, opts, print) {
@@ -346,28 +398,146 @@ function printElement(path, opts, print) {
     parts.push(path.call(print, "startTag"));
   }
   if (node.children && node.children.length > 0) {
+    // Decide whether to inline children based on their raw content
+    const child0 = node.children[0];
+    const isTextNodeType = (n) => n && (n.type === "WXText" || n.type === "WXCharData");
+    const isTextLikeNode = (n) => isTextNodeType(n) || n.type === "WXInterpolation";
+    const getNodeString = (n) => {
+      if (isTextNodeType(n)) return typeof n.value === 'string' ? n.value : '';
+      if (n.type === 'WXInterpolation') return typeof n.rawValue === 'string' ? n.rawValue : '';
+      return '';
+    };
+    const getNodeLen = (n) => getNodeString(n).length;
+
+    const trimmedLen0 = isTextNodeType(child0) && typeof child0.value === 'string' ? child0.value.trim().length : 0;
+    const singleTextInline = node.children.length === 1 &&
+      isTextNodeType(child0) &&
+      trimmedLen0 > 0 &&
+      trimmedLen0 < 50 &&
+      !child0.value.includes("\n");
+
+    // Determine if children are purely textual/interpolation
+    const onlyTextualChildren = node.children.every((n) => isTextLikeNode(n));
+    const hasNewline = node.children.some((n) => getNodeString(n).includes("\n"));
+    const totalLen = node.children.reduce((acc, n) => acc + getNodeLen(n), 0);
+    const hasMeaningful = node.children.some((n) => (isTextNodeType(n) && typeof n.value === 'string' && n.value.trim() !== '') || n.type === 'WXInterpolation');
+    const smallInlineMix = node.children.length <= 3 && onlyTextualChildren && !hasNewline && totalLen < 50 && hasMeaningful;
+
+    const tagName = (node.startTag && node.startTag.name) || (node.endTag && node.endTag.name) || "";
+    const lowerName = typeof tagName === "string" ? tagName.toLowerCase() : "";
+    // Only true block-level tag that must never inline
+    const isAlwaysBlock = lowerName === "block";
+    // Strict text container only when single pure text child under <text>
+    const hasSingleTextChild = node.children.length === 1 && isTextNodeType(child0);
+    const isStrictTextContainer = (lowerName === "text") && hasSingleTextChild;
+
+    // Build prefer-break tags set from options
+    const preferBreakTagsInput = (typeof opts.wxmlPreferBreakTags === 'string') ? opts.wxmlPreferBreakTags : '';
+    const preferBreakTags = new Set(preferBreakTagsInput.split(',').map(s => s.trim().toLowerCase()).filter(Boolean));
+    const isPreferBlock = preferBreakTags.has(lowerName);
+
+    // Attributes presence (for simple <text> rule)
+    const attrsArr = (node.startTag && Array.isArray(node.startTag.attributes)) ? node.startTag.attributes : [];
+    const hasAnyAttrs = attrsArr.length > 0;
+
+    // Simplified: treat <block> as always-block, selected tags as prefer-break.
+    let shouldInline = (singleTextInline || smallInlineMix) && !isAlwaysBlock && !isPreferBlock;
+    // Only <text> strictly checks: if it has any attributes, force break (no inline)
+    if (lowerName === 'text' && hasAnyAttrs) {
+      shouldInline = false;
+    }
+
+    // Strict text rendering switch from options
+    const strictTextMode = !!opts.wxmlStrictText;
+    const treatAsStrictText = strictTextMode && (lowerName === 'text' || isStrictTextContainer);
+    // (no forced non-inline here; small text in <text> can still inline)
+
+    // Now collect printed children according to the decision
     const childrenParts = [];
+    const childEntries = [];
     for (let i = 0; i < node.children.length; i++) {
+      const childNode = node.children[i];
+      if (!shouldInline) {
+        if (!treatAsStrictText && (childNode.type === "WXText" || childNode.type === "WXCharData") && typeof childNode.value === 'string' && childNode.value.trim() === '') {
+          continue; // drop whitespace-only nodes when not inlining (non-strict-text containers only)
+        }
+      }
       const printed = path.call(print, "children", i);
       if (printed && printed !== "") {
         childrenParts.push(printed);
+        childEntries.push({ index: i, node: childNode, printed });
       }
     }
+
     if (childrenParts.length > 0) {
-      const hasOnlySimpleText = node.children.length === 1 &&
-        node.children[0].type === "WXText" &&
-        node.children[0].value &&
-        node.children[0].value.trim().length < 50 &&
-        !node.children[0].value.includes("\n");
-      if (hasOnlySimpleText) {
+      if (shouldInline) {
         parts.push(...childrenParts);
       } else {
         const childrenWithBreaks = [];
         for (let i = 0; i < childrenParts.length; i++) {
           if (i > 0) childrenWithBreaks.push(hardline);
-          childrenWithBreaks.push(childrenParts[i]);
+          const entry = childEntries[i];
+          const printed = childrenParts[i];
+          // In non-strict mode, split multi-line text nodes into doc parts separated by hardline
+          if (!treatAsStrictText && entry && (entry.node.type === "WXText" || entry.node.type === "WXCharData") && typeof printed === "string" && printed.includes("\n")) {
+            const lines = printed.split("\n");
+            for (let li = 0; li < lines.length; li++) {
+              if (li > 0) childrenWithBreaks.push(hardline);
+              if (lines[li] !== "") {
+                childrenWithBreaks.push(lines[li]);
+              }
+            }
+          } else {
+            childrenWithBreaks.push(printed);
+          }
         }
-        parts.push(indent([hardline, ...childrenWithBreaks]), hardline);
+        if (treatAsStrictText) {
+          // Strict mode: preserve children exactly as parsed.
+          // Additionally: convert whitespace-only children without newlines into hardline to reflect visual blank lines.
+          const combinedRaw = node.children.map((n) => getNodeString(n)).join("");
+          const startsWithNL = typeof combinedRaw === 'string' && combinedRaw.startsWith("\n");
+          const endsWithNL = typeof combinedRaw === 'string' && combinedRaw.endsWith("\n");
+
+          const isWhitespaceOnlyNoNL = (entry) => {
+            if (!entry) return false;
+            const n = entry.node;
+            if ((n.type === "WXText" || n.type === "WXCharData") && typeof n.value === 'string') {
+              return n.value.trim() === '' && !n.value.includes("\n");
+            }
+            return false;
+          };
+
+          if (!startsWithNL) {
+            parts.push(hardline);
+          }
+
+          for (let i = 0; i < childrenParts.length; i++) {
+            parts.push(isWhitespaceOnlyNoNL(childEntries[i]) ? hardline : childrenParts[i]);
+          }
+
+          if (!endsWithNL) {
+            parts.push(hardline);
+          }
+        } else {
+          // Special-case: multi-line mustache block like "{{\n  title\n}}" inside non-<text> tag
+          let didSpecial = false;
+          if (lowerName !== 'text' && childrenParts.length === 1 && childEntries.length === 1) {
+          const entry0 = childEntries[0];
+          const printed0 = childrenParts[0];
+          const raw0 = getNodeString(entry0.node);
+          const isTextNode = entry0 && (entry0.node.type === "WXText" || entry0.node.type === "WXCharData");
+          if (isTextNode && typeof printed0 === 'string') {
+            const mlDoc = buildMultiLineMustacheDocFromPrinted(printed0);
+            if (mlDoc) {
+              parts.push(...mlDoc);
+              didSpecial = true;
+            }
+          }
+          }
+          if (!didSpecial) {
+          parts.push(indent([hardline, ...childrenWithBreaks]), hardline);
+          }
+        }
       }
     }
   }
@@ -384,6 +554,10 @@ function printDocument(path, opts, print) {
   const parts = [];
   let lastWasBlock = false; // blocks: element/script/comment
   body.forEach((child, index) => {
+    // Drop whitespace-only top-level text nodes to avoid spurious blank lines
+    if ((child.type === 'WXText' || child.type === 'WXCharData') && typeof child.value === 'string' && child.value.trim() === '') {
+      return;
+    }
     const printed = path.call(print, "body", index);
     const isBlock = child.type === 'WXElement' || child.type === 'WXScript' || child.type === 'WXComment';
     if (printed && printed !== "") {
@@ -398,9 +572,8 @@ function printDocument(path, opts, print) {
   });
   if (parts.length > 0) {
     parts.push(hardline);
-    return join("", parts);
   }
-  return "";
+  return group(parts);
 }
 
 function printComment(path, opts, print) {
@@ -446,8 +619,13 @@ const printer = {
         return printEndTag(path, opts, print);
       case "WXText":
         return printCharData(path, opts, print);
+      case "WXInterpolation":
+        if (!node.rawValue) {
+          throw new Error(`WXInterpolation node missing rawValue. This is a bug in the parser or printer.`);
+        }
+        return node.rawValue;
       default:
-        return node.image || "";
+        throw new Error(`Unknown node type: ${node.type}. This is a bug in the printer.`);
     }
   }
 };
