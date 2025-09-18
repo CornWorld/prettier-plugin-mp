@@ -1,0 +1,1 @@
+<view>{{fn.formatNum(0, {unit: '¥'})}}</view>

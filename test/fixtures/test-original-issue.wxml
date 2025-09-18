@@ -1,0 +1,1 @@
+<view class="product__label-content">{{fn.formatNum(0, {unit: '¥', range: [item.minSkuOriginalPrice, item.maxSkuOriginalPrice]})}}</view>

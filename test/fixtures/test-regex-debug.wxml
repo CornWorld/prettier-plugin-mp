@@ -1,0 +1,4 @@
+<view>{{simple}}</view>
+<view>{{obj.prop}}</view>
+<view>{{fn(arg)}}</view>
+<view>{{fn({key: 'value'})}}</view>
