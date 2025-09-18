@@ -446,6 +446,30 @@ function printElement(path, opts, print) {
     if (lowerName === 'text' && hasAnyAttrs) {
       shouldInline = false;
     }
+    // For <text>, baseline: do not inline unless content is short/simple and structure is trivial
+    if (lowerName === 'text') {
+      shouldInline = false;
+      if (!hasAnyAttrs && onlyTextualChildren && !hasNewline && node.children.length === 1) {
+        const only = node.children[0];
+        const rawCombined = getNodeString(only);
+        const trimmed = typeof rawCombined === 'string' ? rawCombined.trim() : '';
+        const isSingleMustache = trimmed.startsWith('{{') && trimmed.endsWith('}}');
+        const containsMustache = typeof rawCombined === 'string' && rawCombined.includes('{{');
+        if (containsMustache && isSingleMustache) {
+          const inner = trimmed.slice(2, -2);
+          // Complexity heuristics: break if contains object/array literal, or has multiple &&, or both && and ||
+          const hasObjectLiteral = /\{[^}]*:/.test(inner);
+          const hasArrayLiteral = /\[[^\]]*,[^\]]*\]/.test(inner) || /^\s*\[/.test(inner.trim());
+          const andCount = (inner.match(/&&/g) || []).length;
+          const hasOr = inner.includes('||');
+          const complex = hasObjectLiteral || hasArrayLiteral || andCount >= 2 || (andCount >= 1 && hasOr);
+          shouldInline = !complex;
+        } else if (isTextNodeType(only)) {
+          // single pure text: inline if reasonably short
+          shouldInline = trimmed.length <= 50;
+        }
+      }
+    }
 
     // Strict text rendering switch from options
     const strictTextMode = !!opts.wxmlStrictText;
