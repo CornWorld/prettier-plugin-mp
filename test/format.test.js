@@ -208,4 +208,10 @@ describe("Format", () => {
     const result = await formatWxml(input);
     expect(result).toBe(`<view>a {{x}} b</view>\n`);
   });
+
+  it("should format inner tags under <text> while preserving surrounding text verbatim", async () => {
+    const input = `<text>  A \n  <abbr class="x">{{ y||z && w }}</abbr>   B</text>`;
+    const result = await formatWxml(input);
+    expect(result).toBe(`<text>  A \n  <abbr class="x">{{ y || z && w }}</abbr>   B</text>\n`);
+  });
 });

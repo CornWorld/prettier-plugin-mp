@@ -31,14 +31,7 @@ const plugin = {
       description: "The line length where Prettier will try wrap in WXML files.",
       range: { start: 0, end: Infinity, step: 1 }
     },
-    // Whether to render <text> contents strictly (preserve newlines, avoid indentation inside <text>)
-    wxmlStrictText: {
-      type: "boolean",
-      category: "WXML",
-      default: true,
-      description:
-        "Render <text> contents strictly: preserve newlines/whitespace and avoid indentation that would inject spaces."
-    },
+
     // Comma-separated tag names whose children prefer breaking onto their own lines
     wxmlPreferBreakTags: {
       type: "string",
