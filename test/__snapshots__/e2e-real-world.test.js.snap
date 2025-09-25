@@ -787,10 +787,7 @@ exports[`E2E: real-world WXML under wxml-dir > format cps-jd.wxml 1`] = `
         <view style="width:500rpx;float:left;margin-left:35rpx;">
           <view>
             已有
-            <text style="color:red">
-
-            {{item.helpNumber}}
-            </text>
+            <text style="color:red"> {{item.helpNumber}} </text>
             人参与
           </view>
           <view style="color: #B0B0B0;font-size:24rpx;">截止: {{item.dateEnd}}</view>
@@ -1320,10 +1317,7 @@ exports[`E2E: real-world WXML under wxml-dir > format cps-taobao.wxml 1`] = `
         <view style="width:500rpx;float:left;margin-left:35rpx;">
           <view>
             已有
-            <text style="color:red">
-
-            {{item.helpNumber}}
-            </text>
+            <text style="color:red"> {{item.helpNumber}} </text>
             人参与
           </view>
           <view style="color: #B0B0B0;font-size:24rpx;">截止: {{item.dateEnd}}</view>
@@ -2405,12 +2399,8 @@ exports[`E2E: real-world WXML under wxml-dir > format node.wxml 1`] = `
        />
     </block>
   </block>
-  <text wx:elif="{{n.text}}" user-select="{{opts[4]=='force' && isiOS}}" decode>
-  {{n.text}}
-  </text>
-  <text wx:elif="{{n.name==='br'}}">
-  \\n
-  </text>
+  <text wx:elif="{{n.text}}" user-select="{{opts[4]=='force' && isiOS}}" decode>{{n.text}}</text>
+  <text wx:elif="{{n.name==='br'}}">\\n</text>
   <view
     wx:elif="{{n.name==='a'}}"
     id="{{n.attrs.id}}"
@@ -3266,9 +3256,7 @@ exports[`E2E: real-world WXML under wxml-dir > format select.wxml 1`] = `
   <view class="t">
     <view class="name">
       <image src="/images/icon/{{ index == 0?'shop-on':'shop' }}.svg"></image>
-      <text style="color:{{ index == 0?'#FEB21C':'#333333' }}">
-      {{ item.name }}
-      </text>
+      <text style="color:{{ index == 0?'#FEB21C':'#333333' }}">{{ item.name }}</text>
     </view>
     <view wx:if="{{index == 0}}" class="distance">
       {{ item.distance }}
@@ -3293,12 +3281,8 @@ exports[`E2E: real-world WXML under wxml-dir > format select.wxml 1`] = `
     bindtap="goShop"
     data-idx="{{ index }}"
   >
-    <text class="d">
-    {{ item.distance }}
-    </text>
-    <text class="u">
-    km
-    </text>
+    <text class="d">{{ item.distance }}</text>
+    <text class="u">km</text>
     <image src="/images/icon/next.svg"></image>
   </view>
   <button
@@ -3920,10 +3904,7 @@ exports[`E2E: real-world WXML under wxml-dir > format vop.wxml 1`] = `
         <view style="width:500rpx;float:left;margin-left:35rpx;">
           <view>
             已有
-            <text style="color:red">
-
-            {{item.helpNumber}}
-            </text>
+            <text style="color:red"> {{item.helpNumber}} </text>
             人参与
           </view>
           <view style="color: #B0B0B0;font-size:24rpx;">截止: {{item.dateEnd}}</view>
