@@ -62,18 +62,22 @@ You can customize the formatting behavior by adding these options to your `.pret
 
 | 选项 Option | 类型 Type | 默认值 Default | 描述 Description |
 |--------|------|---------|-------------|
-| `wxmlTabWidth` | `int` | `2` | WXML 缩进空格数 Number of spaces per indentation level for WXML |
+| `wxmlTabWidth` | `int` | `2` | WXML 缩进空格数（当前版本暂不生效；请使用 Prettier 的标准 `tabWidth`） Number of spaces per indentation level for WXML (currently ignored; use Prettier `tabWidth`) |
 | `wxmlPrintWidth` | `int` | `80` | WXML 换行长度 Line length where Prettier will try to wrap for WXML |
 | `wxmlSingleQuote` | `boolean` | `false` | WXML 属性使用单引号 Use single quotes in WXML attributes |
+| `wxmlPreferBreakTags` | `string` | `""` | 逗号分隔的标签名集合，强制其子元素换行，例如：`wxs,template,button` Comma-separated tag names to force breaking children, e.g., `wxs,template,button` |
 
 ### WXS 选项 WXS Options
 
 | 选项 Option | 类型 Type | 默认值 Default | 描述 Description |
 |--------|------|---------|-------------|
 | `wxsTabWidth` | `int` | `2` | WXS 代码缩进空格数 Number of spaces per indentation level for WXS code |
-| `wxsPrintWidth` | `int` | `80` | WXS 代码换行长度 Line length where Prettier will try to wrap for WXS code |
 | `wxsSingleQuote` | `boolean` | `true` | WXS 代码使用单引号 Use single quotes in WXS code |
 | `wxsSemi` | `boolean` | `true` | WXS 语句末尾添加分号 Print semicolons at the ends of statements in WXS code |
+| `wxsBabelParserOptions` | `object|string` | `{}` | 传递给 Babel 解析器的选项（可对象或 JSON 字符串），用于 WXS 解析 Options passed to Babel parser for WXS (object or JSON string) |
+| `wxsBabelGeneratorOptions` | `object|string` | `{}` | 传递给 Babel 代码生成器的选项（可对象或 JSON 字符串）；当前不支持换行宽度控制（不支持 `printWidth`） Options passed to Babel generator for WXS (object or JSON string); printWidth-style line wrapping is not supported |
+
+> 说明 Note: `wxsPrintWidth` 目前不受支持，任何配置都会被忽略。Use of `wxsPrintWidth` is currently not supported and will be ignored.
 
 ### 配置示例 Example Configuration
 
@@ -88,8 +92,8 @@ You can customize the formatting behavior by adding these options to your `.pret
         "wxmlTabWidth": 2,
         "wxmlPrintWidth": 100,
         "wxmlSingleQuote": false,
+        "wxmlPreferBreakTags": "wxs,template,button",
         "wxsTabWidth": 2,
-        "wxsPrintWidth": 80,
         "wxsSingleQuote": true,
         "wxsSemi": true
       }
@@ -112,10 +116,10 @@ You can customize the formatting behavior by adding these options to your `.pret
 <view>
   <text>Hello</text>
   <wxs module="test">
-var a = 1;
-function test() {
-  return a;
-}
+  var a = 1;
+  function test() {
+    return a;
+  }
   </wxs>
 </view>
 ```
