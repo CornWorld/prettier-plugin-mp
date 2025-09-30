@@ -210,6 +210,35 @@ function getBabelGeneratorOptions(opts, useSingleQuote) {
     quotes: useSingleQuote ? 'single' : 'double',
     jsescOption: { quotes: useSingleQuote ? 'single' : 'double' },
     semicolons: opts.wxsSemi !== false,
+    
+    // ===== 关于 wxsPrintWidth 不支持的技术说明 =====
+    // 
+    // 1. Babel Generator 的设计局限：
+    //    @babel/generator 是一个 AST-to-code 转换器，专注于语法正确性而非格式美观。
+    //    它没有内置的"列宽感知"逻辑，不会根据 printWidth 自动决定何时换行。
+    //    这与 Prettier 的核心格式化引擎完全不同 —— Prettier 有复杂的布局算法。
+    //
+    // 2. 当前架构的权衡：
+    //    - 优势：使用 Babel 解析+生成确保了 WXS 代码的语法兼容性和稳定性
+    //    - 劣势：无法提供 Prettier 级别的智能换行和列宽控制
+    //    - 现实：大多数 <wxs> 块都比较简短，复杂格式化需求相对较少
+    //
+    // 3. 替代方案的复杂性：
+    //    要真正支持 wxsPrintWidth，需要：
+    //    a) 将 WXS 代码交给 Prettier 的 JS 解析器重新格式化
+    //    b) 处理 Prettier 与 Babel 在语法支持上的细微差异
+    //    c) 确保格式化结果在小程序环境中的兼容性
+    //    d) 增加错误处理复杂度（两套解析器的错误需要统一处理）
+    //
+    // 4. 当前策略：
+    //    保持 Babel 生成路径的简洁性，通过 wxsSemi/wxsSingleQuote 提供基础格式控制，
+    //    避免引入可能破坏现有项目的复杂格式化逻辑。
+    //
+    // 如果项目确实需要复杂的 WXS 格式化，建议：
+    // - 将复杂逻辑提取到独立的 .js 文件中，用标准 Prettier 格式化
+    // - 在 <wxs> 中保持简洁的代码结构
+    // =====================================================
+    
     ...user
   };
 }
@@ -247,6 +276,8 @@ function formatWxsByBabelCompat(jsCode, opts) {
     let pretty = code.replace(/\bfunction\(/g, 'function (');
     return pretty.trimEnd();
   } catch (e) {
+    // 错误处理说明：解析/生成失败不会直接抛出致命错误，先输出简要错误信息，随后返回 null。
+    // 上层 printMisc 在收到 null 后，会抛出一个统一的错误以保留原始内容并中止内嵌格式化。
     try { console.error('[wxs][babel] parse/generate error:', e && e.message); } catch {}
     return null;
   }
@@ -360,6 +391,7 @@ function printMisc(path, opts, print) {
           const snippet = jsCode.split('\n').slice(0, 5).join('\n');
           console.error('[wxs] Unable to format. First lines:', snippet);
         } catch {}
+        // 统一的失败处理：抛出错误以便上层保留原始内容，避免错误输出破坏结构
         throw new Error("Failed to parse/format <wxs> JavaScript");
       }
       const content = (formatted.endsWith("\n") ? formatted : formatted + "\n");
@@ -395,6 +427,7 @@ function printElement(path, opts, print) {
   const node = path.getValue();
   const parts = [];
   if (node.startTag) {
+    // <text> 的处理采用 "早退" 策略，但在此之前仍然会打印开始标签
     parts.push(path.call(print, "startTag"));
   }
   if (node.children && node.children.length > 0) {
@@ -427,6 +460,7 @@ function printElement(path, opts, print) {
     const lowerName = typeof tagName === "string" ? tagName.toLowerCase() : "";
 
     // EARLY RETURN for <text>: verbatim children, no manipulation
+    // 说明：<text> 的子节点按原样输出，不进行空白折叠或换行控制；如果存在属性则强制不内联。
     if (lowerName === 'text') {
       for (let i = 0; i < node.children.length; i++) {
         const childNode = node.children[i];
