@@ -44,12 +44,12 @@
     "prettier": "^3.0.0"
   },
   "dependencies": {
-    "@babel/generator": "^7.28.3",
-    "@babel/parser": "^7.28.3",
+    "@babel/generator": "^8.0.0",
+    "@babel/parser": "^8.0.0",
     "@wxml/parser": "^0.4.0"
   },
   "devDependencies": {
-    "prettier": "^3.0.0",
-    "vitest": "^3.2.4"
+    "prettier": "^3.9.0",
+    "vitest": "^4.0.0"
   }
 }
