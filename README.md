@@ -49,7 +49,7 @@ prettier --plugin=prettier-plugin-mp --write src/pages/index.wxml
 | `wxmlTabWidth` | `int` | `2` | 缩进空格数。当前版本暂不生效，请用 Prettier 标准的 `tabWidth` |
 | `wxmlPrintWidth` | `int` | `80` | 换行长度 |
 | `wxmlSingleQuote` | `boolean` | `false` | 属性用单引号还是双引号 |
-| `wxmlPreferBreakTags` | `string` | `""` | 逗号分隔的标签名集合，强制其中子元素换行。如 `wxs,template,button` |
+| `wxmlPreferBreakTags` | `string` | `wxs,template` | 逗号分隔的标签名集合，强制其中子元素换行。如 `wxs,template,button` |
 
 ### WXS
 
@@ -58,8 +58,8 @@ prettier --plugin=prettier-plugin-mp --write src/pages/index.wxml
 | `wxsTabWidth` | `int` | `2` | 缩进空格数 |
 | `wxsSingleQuote` | `boolean` | `true` | 用单引号 |
 | `wxsSemi` | `boolean` | `true` | 语句末尾加分号 |
-| `wxsBabelParserOptions` | `object\|string` | `{}` | 可传对象或 JSON 字符串，传给 Babel 解析器 |
-| `wxsBabelGeneratorOptions` | `object\|string` | `{}` | 可传对象或 JSON 字符串，传给 Babel 生成器。不支持 `printWidth` 式的换行控制 |
+| `wxsBabelParserOptions` | `string` | — | JSON 字符串，传给 Babel 解析器。如 `{"plugins":["optionalChaining"]}` |
+| `wxsBabelGeneratorOptions` | `string` | — | JSON 字符串，传给 Babel 生成器。不支持 `printWidth` 式的换行控制 |
 
 > `wxsPrintWidth` 目前不受支持，即使配置也会被忽略。
 
@@ -116,11 +116,15 @@ prettier --plugin=prettier-plugin-mp --write src/pages/index.wxml
 - `<wxs>` 标签内完整的 JavaScript 语法
 - 事件处理：`bind:tap`、`catch:tap` 等
 - `<image />`、`<input />` 等自闭合标签
+- `<text>` 内容原样保留
+- `<block>` 强制按块级排版
+- `prettier-ignore-start` / `prettier-ignore-end` 区间忽略
+- 多行 `{{ }}` 表达式与 `&&`、`||` 内联表达式的规范化
 
 ## 开发
 
 ```bash
-git clone https://github.com/your-username/prettier-plugin-mp.git
+git clone https://github.com/CornWorld/prettier-plugin-mp.git
 cd prettier-plugin-mp
 
 pnpm install
