@@ -2,41 +2,17 @@
 
 微信小程序 WXML 和 WXS 文件的 Prettier 格式化插件。
 
-A Prettier plugin for formatting WeChat Mini Program WXML and WXS files with professional code quality.
-
-## 特性 Features
-
-✅ **WXML 格式化**: 为 WXML 文件提供正确的缩进和结构  
-✅ **WXS JavaScript 格式化**: 为嵌入的 WXS 模块提供完整的 JavaScript 格式化  
-✅ **可配置选项**: 为 WXML 和 WXS 提供独立的格式化选项  
-✅ **微信语法支持**: 完整支持 `wx:for`、`wx:if` 和其他微信指令  
-✅ **专业品质**: 基于官方 Prettier XML 插件架构  
-
-## 安装 Installation
+## 安装
 
 ```bash
 pnpm install -D prettier-plugin-mp
-# 或者 or
+# 或
 npm install --save-dev prettier-plugin-mp
 ```
 
-## 使用方法 Usage
+## 配置
 
-### 基本使用 Basic Usage
-
-### 命令行 Command Line
-
-```bash
-# 格式化所有 WXML 文件 Format all WXML files
-prettier --plugin=prettier-plugin-mp --write "**/*.wxml"
-
-# 格式化指定文件 Format specific file
-prettier --plugin=prettier-plugin-mp --write src/pages/index.wxml
-```
-
-### Configuration File
-
-Create a `.prettierrc` file:
+在 `.prettierrc` 中注册插件，并让 Prettier 用 `wxml` 解析器处理 `*.wxml`：
 
 ```json
 {
@@ -52,34 +28,42 @@ Create a `.prettierrc` file:
 }
 ```
 
-## 配置选项 Configuration Options
+## 命令行
 
-你可以通过在 `.prettierrc` 文件中添加这些选项来自定义格式化行为：
+```bash
+# 格式化所有 WXML 文件
+prettier --plugin=prettier-plugin-mp --write "**/*.wxml"
 
-You can customize the formatting behavior by adding these options to your `.prettierrc` file:
+# 格式化单个文件
+prettier --plugin=prettier-plugin-mp --write src/pages/index.wxml
+```
 
-### WXML 选项 WXML Options
+## 选项
 
-| 选项 Option | 类型 Type | 默认值 Default | 描述 Description |
+所有选项都写在 `.prettierrc` 的 `overrides[].options` 里。WXML 和 WXS 各自独立。
+
+### WXML
+
+| 选项 | 类型 | 默认值 | 说明 |
 |--------|------|---------|-------------|
-| `wxmlTabWidth` | `int` | `2` | WXML 缩进空格数（当前版本暂不生效；请使用 Prettier 的标准 `tabWidth`） Number of spaces per indentation level for WXML (currently ignored; use Prettier `tabWidth`) |
-| `wxmlPrintWidth` | `int` | `80` | WXML 换行长度 Line length where Prettier will try to wrap for WXML |
-| `wxmlSingleQuote` | `boolean` | `false` | WXML 属性使用单引号 Use single quotes in WXML attributes |
-| `wxmlPreferBreakTags` | `string` | `""` | 逗号分隔的标签名集合，强制其子元素换行，例如：`wxs,template,button` Comma-separated tag names to force breaking children, e.g., `wxs,template,button` |
+| `wxmlTabWidth` | `int` | `2` | 缩进空格数。当前版本暂不生效，请用 Prettier 标准的 `tabWidth` |
+| `wxmlPrintWidth` | `int` | `80` | 换行长度 |
+| `wxmlSingleQuote` | `boolean` | `false` | 属性用单引号还是双引号 |
+| `wxmlPreferBreakTags` | `string` | `""` | 逗号分隔的标签名集合，强制其中子元素换行。如 `wxs,template,button` |
 
-### WXS 选项 WXS Options
+### WXS
 
-| 选项 Option | 类型 Type | 默认值 Default | 描述 Description |
-|--------|------|---------|-------------|
-| `wxsTabWidth` | `int` | `2` | WXS 代码缩进空格数 Number of spaces per indentation level for WXS code |
-| `wxsSingleQuote` | `boolean` | `true` | WXS 代码使用单引号 Use single quotes in WXS code |
-| `wxsSemi` | `boolean` | `true` | WXS 语句末尾添加分号 Print semicolons at the ends of statements in WXS code |
-| `wxsBabelParserOptions` | `object|string` | `{}` | 传递给 Babel 解析器的选项（可对象或 JSON 字符串），用于 WXS 解析 Options passed to Babel parser for WXS (object or JSON string) |
-| `wxsBabelGeneratorOptions` | `object|string` | `{}` | 传递给 Babel 代码生成器的选项（可对象或 JSON 字符串）；当前不支持换行宽度控制（不支持 `printWidth`） Options passed to Babel generator for WXS (object or JSON string); printWidth-style line wrapping is not supported |
+| 选项 | 类型 | 默认值 | 说明 |
+|--------|------|---------|------|
+| `wxsTabWidth` | `int` | `2` | 缩进空格数 |
+| `wxsSingleQuote` | `boolean` | `true` | 用单引号 |
+| `wxsSemi` | `boolean` | `true` | 语句末尾加分号 |
+| `wxsBabelParserOptions` | `object\|string` | `{}` | 可传对象或 JSON 字符串，传给 Babel 解析器 |
+| `wxsBabelGeneratorOptions` | `object\|string` | `{}` | 可传对象或 JSON 字符串，传给 Babel 生成器。不支持 `printWidth` 式的换行控制 |
 
-> 说明 Note: `wxsPrintWidth` 目前不受支持，任何配置都会被忽略。Use of `wxsPrintWidth` is currently not supported and will be ignored.
+> `wxsPrintWidth` 目前不受支持，即使配置也会被忽略。
 
-### 配置示例 Example Configuration
+### 完整示例
 
 ```json
 {
@@ -102,15 +86,15 @@ You can customize the formatting behavior by adding these options to your `.pret
 }
 ```
 
-## 示例 Examples
+## 格式化效果
 
-### 格式化前 Before Formatting
+格式化前：
 
 ```xml
 <view><text>Hello</text><wxs module="test">var a=1;function test(){return a;}</wxs></view>
 ```
 
-### 格式化后 After Formatting
+格式化后：
 
 ```xml
 <view>
@@ -124,34 +108,26 @@ You can customize the formatting behavior by adding these options to your `.pret
 </view>
 ```
 
-## 支持的语法 Supported Syntax
+## 支持的语法
 
-- **WXML 元素**: 所有标准 WXML 标签和属性 All standard WXML tags and attributes
-- **微信指令**: `wx:for`, `wx:if`, `wx:elif`, `wx:else`, `wx:key` 等 WeChat Directives
-- **数据绑定**: `{{ }}` 表达式 Data Binding expressions
-- **WXS 模块**: `<wxs>` 标签内的完整 JavaScript 语法 Complete JavaScript syntax within `<wxs>` tags
-- **事件处理**: `bind:tap`, `catch:tap` 等 Event Handlers
-- **自闭合标签**: `<image />`, `<input />` 等的正确格式化 Proper formatting for self-closing tags
+- 标准 WXML 标签与属性
+- 微信指令：`wx:for`、`wx:if`、`wx:elif`、`wx:else`、`wx:key` 等
+- `{{ }}` 数据绑定表达式
+- `<wxs>` 标签内完整的 JavaScript 语法
+- 事件处理：`bind:tap`、`catch:tap` 等
+- `<image />`、`<input />` 等自闭合标签
 
-## 开发 Development
+## 开发
 
 ```bash
-# 克隆仓库 Clone the repository
 git clone https://github.com/your-username/prettier-plugin-mp.git
 cd prettier-plugin-mp
 
-# 安装依赖 Install dependencies
 pnpm install
-# 或者 or
-npm install
-
-# 运行测试 Run tests
 npm test
-
-# 测试格式化 Test formatting
 npm run format:wxml
 ```
 
-## 许可证 License
+## 许可证
 
 MIT
