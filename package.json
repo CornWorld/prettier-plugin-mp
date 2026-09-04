@@ -22,7 +22,7 @@
     "test": "vitest run",
     "test:coverage": "vitest --coverage",
     "format": "prettier --write \"**/*.{js,json,md}\"",
-    "format:wxml": "prettier --plugin=./index.js --write \"**/*.wxml\""
+    "format:wxml": "prettier --plugin=./src/index.js --write \"**/*.wxml\""
   },
   "keywords": [
     "prettier",
