@@ -122,7 +122,7 @@ function printStartTag(path, opts, print) {
     // Calculate approximate length to decide line breaks
     const attributesLength = attributeDocs.reduce(
       (sum, current) => sum + String(current).length + 1,
-      0
+      0,
     );
     const printWidth =
       typeof opts.wxmlPrintWidth === "number"
@@ -212,7 +212,6 @@ function getBabelGeneratorOptions(opts, useSingleQuote) {
     quotes: useSingleQuote ? "single" : "double",
     jsescOption: { quotes: useSingleQuote ? "single" : "double" },
     semicolons: opts.wxsSemi !== false,
-
     // ===== 关于 wxsPrintWidth 不支持的技术说明 =====
     //
     // 1. Babel Generator 的设计局限：
@@ -245,6 +244,27 @@ function getBabelGeneratorOptions(opts, useSingleQuote) {
   };
 }
 
+// WXS 代码内部的缩进宽度（wxsTabWidth，缺省回落到标准 tabWidth）。
+// 注意：这只控制 <wxs> 内 JavaScript 的相对缩进；节点在 WXML 中的层级缩进
+// 由 doc builders 跟随 Prettier 的 tabWidth。
+function resolveWxsIndentWidth(opts) {
+  if (opts && typeof opts.wxsTabWidth === "number") return opts.wxsTabWidth;
+  return (opts && opts.tabWidth) || 2;
+}
+
+// @babel/generator 8 移除了 indent 选项（输出固定 2 空格缩进），
+// 因此生成后按目标宽度重排行首空白（Babel 缩进恒为 2 的倍数）。
+function reindentWxsCode(code, width) {
+  if (width === 2) return code;
+  return code
+    .split("\n")
+    .map((line) => {
+      const lead = line.match(/^ */)[0];
+      return " ".repeat((lead.length / 2) * width) + line.slice(lead.length);
+    })
+    .join("\n");
+}
+
 // Use Babel generator to produce stable output close to Prettier
 function formatWxsByBabelCompat(jsCode, opts) {
   try {
@@ -257,10 +277,10 @@ function formatWxsByBabelCompat(jsCode, opts) {
     const { code } = gen(
       ast,
       getBabelGeneratorOptions(opts, useSingle),
-      jsCode
+      jsCode,
     );
     let pretty = code.replace(/\bfunction\(/g, "function (");
-    return pretty.trimEnd();
+    return reindentWxsCode(pretty, resolveWxsIndentWidth(opts)).trimEnd();
   } catch (e) {
     // 错误处理说明：解析/生成失败不会直接抛出致命错误，先输出简要错误信息，随后返回 null。
     // 上层 printMisc 在收到 null 后，会抛出一个统一的错误以保留原始内容并中止内嵌格式化。
@@ -269,14 +289,6 @@ function formatWxsByBabelCompat(jsCode, opts) {
     } catch {}
     return null;
   }
-}
-
-function indentLines(text, indentSize) {
-  const pad = " ".repeat(indentSize);
-  return text
-    .split("\n")
-    .map((l) => (l.trim() ? pad + l : l))
-    .join("\n");
 }
 
 function formatInlineJsExpression(expr, opts) {
@@ -351,12 +363,11 @@ function printMisc(path, opts, print) {
 
   // Handle WXScript nodes
   if (node.type === "WXScript") {
-    let result = "";
+    const parts = [];
 
     // Print start tag manually
     if (node.startTag) {
-      const isSelfClosing = !!node.startTag.selfClosing;
-      result += `<${node.startTag.name}`;
+      let startTag = `<${node.startTag.name}`;
       if (node.startTag.attributes && node.startTag.attributes.length > 0) {
         for (const attr of node.startTag.attributes) {
           const normalized =
@@ -364,27 +375,22 @@ function printMisc(path, opts, print) {
               ? attr.key
               : `${attr.key}=${normalizeAttrValueForWxmlQuotes(
                   attr.value,
-                  opts
+                  opts,
                 )}`;
-          result += ` ${normalized}`;
+          startTag += ` ${normalized}`;
         }
       }
-      if (isSelfClosing) {
-        result += " />";
-        return result; // self-closing: no content, no end tag
-      } else {
-        result += ">";
+      if (node.startTag.selfClosing) {
+        return `${startTag} />`; // self-closing: no content, no end tag
       }
+      parts.push(`${startTag}>`);
     }
 
-    // Print content with proper JavaScript formatting
-    if (node.value) {
-      result += "\n";
+    // Print content with proper JavaScript formatting.
+    // 用 doc builders 组织行结构：内容包在 indent() 里、闭合标签前用 hardline，
+    // 这样嵌套 <wxs> 的内容与闭合标签都能继承节点在 WXML 中的缩进层级。
+    if (node.value && node.value.trim()) {
       const jsCode = node.value.trim();
-      const indentSize =
-        typeof opts.wxsTabWidth === "number"
-          ? opts.wxsTabWidth
-          : opts.tabWidth || 2;
       let formatted = formatWxsByBabelCompat(jsCode, opts);
       if (typeof formatted === "string") {
         // Enforce preferred string quote style for simple literals only when formatted
@@ -398,20 +404,21 @@ function printMisc(path, opts, print) {
         // 统一的失败处理：抛出错误以便上层保留原始内容，避免错误输出破坏结构
         throw new Error("Failed to parse/format <wxs> JavaScript");
       }
-      const content = formatted.endsWith("\n") ? formatted : formatted + "\n";
-      result += indentLines(content, indentSize);
+      parts.push(
+        indent([hardline, join(hardline, formatted.split("\n"))]),
+        hardline,
+      );
     }
 
-    // Print end tag manually
     if (node.endTag) {
-      result += `</${node.endTag.name}>`;
+      parts.push(`</${node.endTag.name}>`);
     }
 
-    return result;
+    return parts;
   }
 
   throw new Error(
-    `printMisc received unknown node type: ${node.type}. This is a bug in the printer.`
+    `printMisc received unknown node type: ${node.type}. This is a bug in the printer.`,
   );
 }
 
@@ -465,7 +472,7 @@ function printElement(path, opts, print) {
     // Determine if children are purely textual/interpolation
     const onlyTextualChildren = node.children.every((n) => isTextLikeNode(n));
     const hasNewline = node.children.some((n) =>
-      getNodeString(n).includes("\n")
+      getNodeString(n).includes("\n"),
     );
     const totalLen = node.children.reduce((acc, n) => acc + getNodeLen(n), 0);
     const hasMeaningful = node.children.some(
@@ -473,7 +480,7 @@ function printElement(path, opts, print) {
         (isTextNodeType(n) &&
           typeof n.value === "string" &&
           n.value.trim() !== "") ||
-        n.type === "WXInterpolation"
+        n.type === "WXInterpolation",
     );
     const smallInlineMix =
       node.children.length <= 3 &&
@@ -525,7 +532,7 @@ function printElement(path, opts, print) {
       preferBreakTagsInput
         .split(",")
         .map((s) => s.trim().toLowerCase())
-        .filter(Boolean)
+        .filter(Boolean),
     );
     const isPreferBlock = preferBreakTags.has(lowerName);
 
@@ -703,13 +710,13 @@ const printer = {
       case "WXInterpolation":
         if (!node.rawValue) {
           throw new Error(
-            `WXInterpolation node missing rawValue. This is a bug in the parser or printer.`
+            `WXInterpolation node missing rawValue. This is a bug in the parser or printer.`,
           );
         }
         return node.rawValue;
       default:
         throw new Error(
-          `Unknown node type: ${node.type}. This is a bug in the printer.`
+          `Unknown node type: ${node.type}. This is a bug in the printer.`,
         );
     }
   },

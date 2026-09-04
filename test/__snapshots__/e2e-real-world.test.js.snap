@@ -393,22 +393,22 @@ exports[`E2E: real-world WXML under wxml-dir > format category.wxml 1`] = `
     </view> -->
     <!-- 显示右侧商品 -->
     <wxs module="goodsDetailPage">
-  module.exports = {
-    url: function (item) {
-      if (item.supplyType == 'cps_jd') {
-        return '/packageCps/pages/goods-details/cps-jd?id=' + item.id;
-      } else if (item.supplyType == 'vop_jd') {
-        return '/pages/goods-details/vop?id=' + item.yyId + '&goodsId=' + item.id;
-      } else if (item.supplyType == 'cps_pdd') {
-        return '/packageCps/pages/goods-details/cps-pdd?id=' + item.id;
-      } else if (item.supplyType == 'cps_taobao') {
-        return '/packageCps/pages/goods-details/cps-taobao?id=' + item.id;
-      } else {
-        return '/pages/goods-details/index?id=' + item.id;
-      }
-    }
-  };
-</wxs>
+      module.exports = {
+        url: function (item) {
+          if (item.supplyType == 'cps_jd') {
+            return '/packageCps/pages/goods-details/cps-jd?id=' + item.id;
+          } else if (item.supplyType == 'vop_jd') {
+            return '/pages/goods-details/vop?id=' + item.yyId + '&goodsId=' + item.id;
+          } else if (item.supplyType == 'cps_pdd') {
+            return '/packageCps/pages/goods-details/cps-pdd?id=' + item.id;
+          } else if (item.supplyType == 'cps_taobao') {
+            return '/packageCps/pages/goods-details/cps-taobao?id=' + item.id;
+          } else {
+            return '/pages/goods-details/index?id=' + item.id;
+          }
+        }
+      };
+    </wxs>
     <van-card
       wx:for="{{currentGoods}}"
       wx:key="id"
@@ -3162,22 +3162,22 @@ exports[`E2E: real-world WXML under wxml-dir > format scan-result.wxml 1`] = `
   <view class="goods-list">
     <view class="list-title">商品信息</view>
     <wxs module="goodsDetailPage">
-  module.exports = {
-    url: function (item) {
-      if (item.supplyType == 'cps_jd') {
-        return '/packageCps/pages/goods-details/cps-jd?id=' + item.goodsId;
-      } else if (item.supplyType == 'vop_jd') {
-        return '/pages/goods-details/vop?id=' + item.yyId + '&goodsId=' + item.id;
-      } else if (item.supplyType == 'cps_pdd') {
-        return '/packageCps/pages/goods-details/cps-pdd?id=' + item.goodsId;
-      } else if (item.supplyType == 'cps_taobao') {
-        return '/packageCps/pages/goods-details/cps-taobao?id=' + item.goodsId;
-      } else {
-        return '/pages/goods-details/index?id=' + item.goodsId;
-      }
-    }
-  };
-</wxs>
+      module.exports = {
+        url: function (item) {
+          if (item.supplyType == 'cps_jd') {
+            return '/packageCps/pages/goods-details/cps-jd?id=' + item.goodsId;
+          } else if (item.supplyType == 'vop_jd') {
+            return '/pages/goods-details/vop?id=' + item.yyId + '&goodsId=' + item.id;
+          } else if (item.supplyType == 'cps_pdd') {
+            return '/packageCps/pages/goods-details/cps-pdd?id=' + item.goodsId;
+          } else if (item.supplyType == 'cps_taobao') {
+            return '/packageCps/pages/goods-details/cps-taobao?id=' + item.goodsId;
+          } else {
+            return '/pages/goods-details/index?id=' + item.goodsId;
+          }
+        }
+      };
+    </wxs>
     <block wx:for="{{orderDetail.goods}}" wx:key="{{index}}">
       <navigator url="{{ goodsDetailPage.url(item) }}">
         <view class="a-goods">

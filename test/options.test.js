@@ -32,7 +32,10 @@ describe("Options", () => {
   it("should respect wxmlPrintWidth", async () => {
     const source = `<view class="a b c d e f g h i j k l m n o p q r s t u v w x y z"></view>`;
     const expected = `<view\n  class="a b c d e f g h i j k l m n o p q r s t u v w x y z"\n></view>\n`;
-    const result = await formatWxml(source, { printWidth: 60, wxmlPrintWidth: 60 });
+    const result = await formatWxml(source, {
+      printWidth: 60,
+      wxmlPrintWidth: 60,
+    });
     expect(result).toBe(expected);
   });
 
@@ -40,11 +43,11 @@ describe("Options", () => {
     it("should break children for tags listed in wxmlPreferBreakTags (e.g., button)", async () => {
       const source = `<view>\n  <button type="primary" size="mini" bindtap="_save"> 保存 </button>\n</view>`;
       const expected = `<view>\n  <button type="primary" size="mini" bindtap="_save">\n    保存\n  </button>\n</view>\n`;
-      const result = await formatWxml(source, { wxmlPreferBreakTags: "wxs,template,button" });
+      const result = await formatWxml(source, {
+        wxmlPreferBreakTags: "wxs,template,button",
+      });
       expect(result).toBe(expected);
     });
-
-
   });
 
   describe("WXS Formatting Options", () => {
@@ -65,13 +68,34 @@ module.exports.message = msg;
 
     it("should respect wxsSemi=false", async () => {
       const expected = `<wxs module="m1">\n  var msg = 'hello world';\n  var foo = function (bar) {\n    return bar;\n  };\n  module.exports.message = msg;\n</wxs>\n`;
-      const result = await formatWxml(wxsSource, { wxsSemi: false, printWidth: 80, wxsSingleQuote: true });
+      const result = await formatWxml(wxsSource, {
+        wxsSemi: false,
+        printWidth: 80,
+        wxsSingleQuote: true,
+      });
       expect(result).toBe(expected);
     });
 
     it("should respect wxsSingleQuote=false", async () => {
       const expected = `<wxs module="m1">\n  var msg = "hello world";\n  var foo = function (bar) {\n    return bar;\n  };\n  module.exports.message = msg;\n</wxs>\n`;
-      const result = await formatWxml(wxsSource, { wxsSingleQuote: false, printWidth: 80 });
+      const result = await formatWxml(wxsSource, {
+        wxsSingleQuote: false,
+        printWidth: 80,
+      });
+      expect(result).toBe(expected);
+    });
+
+    it("should indent nested <wxs> content and closing tag by node depth", async () => {
+      const source = `<view><wxs module="m">var a=1;</wxs></view>`;
+      const expected = `<view>\n  <wxs module="m">\n    var a = 1;\n  </wxs>\n</view>\n`;
+      const result = await formatWxml(source, {});
+      expect(result).toBe(expected);
+    });
+
+    it("should use wxsTabWidth for code indentation inside <wxs>", async () => {
+      const source = `<wxs module="m">var a=1;function f(){return 1;}</wxs>`;
+      const expected = `<wxs module="m">\n  var a = 1;\n  function f() {\n      return 1;\n  }\n</wxs>\n`;
+      const result = await formatWxml(source, { wxsTabWidth: 4 });
       expect(result).toBe(expected);
     });
   });
@@ -87,8 +111,9 @@ module.exports.message = msg;
     it("should throw for invalid JS in <wxs>", async () => {
       // Intentionally invalid JS to force parser error
       const invalid = `<wxs module="m1">\nvar a = ;\nfunction (x) {\n  return x+1;\n}\n</wxs>`;
-      await expect(formatWxml(invalid, {}))
-        .rejects.toThrow(/Failed to parse\/format <wxs> JavaScript/);
+      await expect(formatWxml(invalid, {})).rejects.toThrow(
+        /Failed to parse\/format <wxs> JavaScript/,
+      );
     });
   });
 });
