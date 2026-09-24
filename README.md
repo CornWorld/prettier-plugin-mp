@@ -133,6 +133,7 @@ WXML 的缩进层级与整体换行宽度直接使用 Prettier 标准选项 `tab
 
 - 标签、属性与自闭合标签（`<image />`、`<input />`）
 - 微信指令（`wx:for`、`wx:if`、`wx:key` 等）与事件绑定（`bind:tap`、`catch:tap` 等）
+- glass-easel（新版组件框架）的全部模板指令：`class:` / `style:` 绑定、`let:` 临时变量、`slot:` 动态插槽、`model:` 双向绑定、`worklet:`、`generic:`、`extra-attr:` 等
 - `{{ }}` 数据绑定，含多行表达式与 `&&` / `||` 的规范化
 - `<wxs>` 内的完整 JavaScript 语法
 - `<text>` 内容原样保留，`<block>` 按块级排版
